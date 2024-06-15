@@ -18,6 +18,8 @@ git push origin [branch] --force-with-lease
 
 If a PR is waiting and got out of date, repeat the same steps above, or simply select "Rebase branch" on the Github website.
 
+For PR merging, we use the "Squash and merge" option.
+
 ## Setup
 
 Either use the provided devcontainer, or make sure that you have virtual environment installed with Python >=3.10 and Poetry.
@@ -33,6 +35,8 @@ To set up pre-commit hooks and make sure the syntaxes are consistent:
 ```bash
 poetry run pre-commit install
 ```
+
+It might take a while for black and isort to be installed on your first commit.
 
 The bot can be executed with (will be implemented later):
 
