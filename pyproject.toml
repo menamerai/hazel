@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "hazel"
+version = "0.1.0"
+description = "Discord bot for Future of Data Hackathon"
+authors = ["menamerai <rphananh@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.10"
+"discord.py" = "^2.3.2"
+pre-commit = "^3.7.1"
+pysqlite3 = "^0.5.3"
+pytest = "^8.2.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
