@@ -12,6 +12,7 @@ python = ">=3.10"
 pre-commit = "^3.7.1"
 pysqlite3 = "^0.5.3"
 pytest = "^8.2.2"
+python-dotenv = "^1.0.1"
 
 
 [build-system]

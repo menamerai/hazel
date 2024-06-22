@@ -22,6 +22,8 @@ For PR merging, we use the "Squash and merge" option.
 
 ## Setup
 
+Ask @menamerai for the environment secrets, then create a file on root called `.env` and write the secrets in.
+
 Either use the provided devcontainer, or make sure that you have virtual environment installed with Python >=3.10 and Poetry.
 
 To install dependencies:
@@ -38,7 +40,19 @@ poetry run pre-commit install
 
 It might take a while for black and isort to be installed on your first commit.
 
-The bot can be executed with (will be implemented later):
+Remember to execute all code-related commands with `poetry run [command]`, or spawn a poetry shell with:
+
+```bash
+poetry shell
+```
+
+Make sure the database is initialized with:
+
+```bash
+python init_database.py
+```
+
+The bot can be executed with:
 
 ```bash
 python run_bot.py
@@ -49,5 +63,5 @@ python run_bot.py
 For every functionality that is added in the `hazel` directory, make sure to create corresponding tests in `tests`. To check if the test passed, we can run
 
 ```bash
-pytest
+poetry run pytest
 ```
