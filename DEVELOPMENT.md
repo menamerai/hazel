@@ -22,6 +22,8 @@ For PR merging, we use the "Squash and merge" option.
 
 ## Setup
 
+Ask @menamerai for the environment secrets, then create a file on root called `.env` and write the secrets in.
+
 Either use the provided devcontainer, or make sure that you have virtual environment installed with Python >=3.10 and Poetry.
 
 To install dependencies:
