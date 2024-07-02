@@ -9,6 +9,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from dotenv import load_dotenv
+from supabase import Client, create_client
 
 load_dotenv()
 
@@ -26,9 +27,9 @@ logging.basicConfig(
 )
 
 # exit if the database does not exist
-if "data.db" not in os.listdir("hazel"):
-    logging.error("main: Database does not exist, exiting")
-    exit(1)
+# if "data.db" not in os.listdir("hazel"):
+#     logging.error("main: Database does not exist, exiting")
+#     exit(1)
 
 
 @client.event
@@ -52,20 +53,18 @@ async def ping(interaction: discord.Interaction):
 async def register(interaction: discord.Interaction):
     logging.info(f"register: Received register request from {interaction.user}")
     try:
-        conn = sqlite3.connect("hazel/data.db")
-        c = conn.cursor()
-        c.execute("INSERT INTO HACKER (USERNAME) VALUES (?)", (interaction.user.name,))
-        conn.commit()
-        conn.close()
+        supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+        response = (
+            supabase.table("HACKER")
+            .insert({"username": interaction.user.name})
+            .execute()
+        )
     except Exception as e:
         logging.error(f"register: Error registering {interaction.user}: {e}")
         await interaction.response.send_message(
             "An error occurred while registering.", ephemeral=True
         )
         return
-    finally:
-        if conn:
-            conn.close()
     logging.info(f"register: Registered {interaction.user} as a hacker")
     await interaction.response.send_message("Registered as a hacker.", ephemeral=True)
 
@@ -76,20 +75,19 @@ async def register(interaction: discord.Interaction):
 async def unregister(interaction: discord.Interaction):
     logging.info(f"unregister: Received unregister request from {interaction.user}")
     try:
-        conn = sqlite3.connect("hazel/data.db")
-        c = conn.cursor()
-        c.execute("DELETE FROM HACKER WHERE USERNAME = ?", (interaction.user.name,))
-        conn.commit()
-        conn.close()
+        supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+        response = (
+            supabase.table("HACKER")
+            .delete()
+            .eq("username", interaction.user.name)
+            .execute()
+        )
     except Exception as e:
         logging.error(f"unregister: Error unregistering {interaction.user}: {e}")
         await interaction.response.send_message(
             "An error occurred while unregistering.", ephemeral=True
         )
         return
-    finally:
-        if conn:
-            conn.close()
     logging.info(f"unregister: Unregistered {interaction.user} as a hacker")
     await interaction.response.send_message("Unregistered as a hacker.", ephemeral=True)
 
@@ -100,11 +98,13 @@ async def display_profile(interaction: discord.Interaction):
         f"display_profile: Received display profile request from {interaction.user}"
     )
     try:
-        conn = sqlite3.connect("hazel/data.db")
-        c = conn.cursor()
-        c.execute("SELECT * FROM HACKER WHERE USERNAME = ?", (interaction.user.name,))
-        result = c.fetchone()
-        conn.close()
+        supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+        response = (
+            supabase.table("HACKER")
+            .select("*")
+            .eq("username", interaction.user.name)
+            .execute()
+        )
     except Exception as e:
         logging.error(
             f"display_profile: Error displaying profile for {interaction.user}: {e}"
@@ -113,16 +113,14 @@ async def display_profile(interaction: discord.Interaction):
             "An error occurred while displaying your profile.", ephemeral=True
         )
         return
-    finally:
-        if conn:
-            conn.close()
-    if not result:
+    if not response:
         logging.info(f"display_profile: No profile found for {interaction.user}")
         await interaction.response.send_message("No profile found.", ephemeral=True)
         return
     logging.info(f"display_profile: Displaying profile for {interaction.user}")
-    profile_string = f"ID: {result[0]}\nUsername: {result[1]}\nSkills: {result[2]}\nJoined at: {result[3]}\nJoined matchmaking: {bool(result[4])}\nMatchmade: {bool(result[5])}"
-    await interaction.response.send_message(profile_string, ephemeral=True)
+    # Untested formatting
+    # profile_string = f"ID: {response["data"][0]["ID"]}\nUsername: {response["data"][0]["USERNAME"]}\nSkills: {response["data"][0]["SKILLS"]}\nJoined at: {result["data"][0]["JOINED_AT"]}\nJoined matchmaking: {bool(result["data"][0]["JOINED_MATCHMAKING"])}\nMatchmade: {bool(result["data"][0]["MATCHMADE"])}"
+    # await interaction.response.send_message(profile_string, ephemeral=True)
 
 
 async def main():
