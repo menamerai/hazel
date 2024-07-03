@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import os
-import sqlite3
 from datetime import datetime
 from sys import stdout
 
