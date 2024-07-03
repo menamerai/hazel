@@ -55,7 +55,7 @@ async def register(interaction: discord.Interaction):
     try:
         supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
         response = (
-            supabase.table("HACKER")
+            supabase.table("hacker")
             .insert({"username": interaction.user.name})
             .execute()
         )
@@ -77,7 +77,7 @@ async def unregister(interaction: discord.Interaction):
     try:
         supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
         response = (
-            supabase.table("HACKER")
+            supabase.table("hacker")
             .delete()
             .eq("username", interaction.user.name)
             .execute()
@@ -100,7 +100,7 @@ async def display_profile(interaction: discord.Interaction):
     try:
         supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
         response = (
-            supabase.table("HACKER")
+            supabase.table("hacker")
             .select("*")
             .eq("username", interaction.user.name)
             .execute()
@@ -119,8 +119,9 @@ async def display_profile(interaction: discord.Interaction):
         return
     logging.info(f"display_profile: Displaying profile for {interaction.user}")
     # Untested formatting
-    # profile_string = f"ID: {response["data"][0]["ID"]}\nUsername: {response["data"][0]["USERNAME"]}\nSkills: {response["data"][0]["SKILLS"]}\nJoined at: {result["data"][0]["JOINED_AT"]}\nJoined matchmaking: {bool(result["data"][0]["JOINED_MATCHMAKING"])}\nMatchmade: {bool(result["data"][0]["MATCHMADE"])}"
-    # await interaction.response.send_message(profile_string, ephemeral=True)
+    # print(f"ID: {response.data[0]['id']}")
+    profile_string = f"ID: {response.data[0]['id']}\nUsername: {response.data[0]['username']}\nSkills: {response.data[0]['skills']}\nJoined at: {response.data[0]['joined_at']}\nJoined matchmaking: {bool(response.data[0]['joined_matchmaking'])}\nMatchmade: {bool(response.data[0]['matchmade'])}"
+    await interaction.response.send_message(profile_string, ephemeral=True)
 
 
 async def main():
