@@ -13,6 +13,7 @@ from supabase import Client, create_client
 load_dotenv()
 
 client = commands.Bot(command_prefix="/", intents=discord.Intents.all())
+supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,11 +25,6 @@ logging.basicConfig(
         ),
     ],
 )
-
-# exit if the database does not exist
-# if "data.db" not in os.listdir("hazel"):
-#     logging.error("main: Database does not exist, exiting")
-#     exit(1)
 
 
 @client.event
@@ -52,14 +48,16 @@ async def ping(interaction: discord.Interaction):
 async def register(interaction: discord.Interaction):
     logging.info(f"register: Received register request from {interaction.user}")
     try:
-        supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
-        response = (
-            supabase.table("hacker")
-            .insert({"username": interaction.user.name})
-            .execute()
-        )
+        supabase.table("hacker").insert({"username": interaction.user.name}).execute()
     except Exception as e:
         logging.error(f"register: Error registering {interaction.user}: {e}")
+        # 23505 - User is already registered
+        if e.code == "23505":
+            await interaction.response.send_message(
+                "You are already registered.", ephemeral=True
+            )
+            return
+
         await interaction.response.send_message(
             "An error occurred while registering.", ephemeral=True
         )
@@ -74,13 +72,9 @@ async def register(interaction: discord.Interaction):
 async def unregister(interaction: discord.Interaction):
     logging.info(f"unregister: Received unregister request from {interaction.user}")
     try:
-        supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
-        response = (
-            supabase.table("hacker")
-            .delete()
-            .eq("username", interaction.user.name)
-            .execute()
-        )
+        supabase.table("hacker").delete().eq(
+            "username", interaction.user.name
+        ).execute()
     except Exception as e:
         logging.error(f"unregister: Error unregistering {interaction.user}: {e}")
         await interaction.response.send_message(
@@ -97,7 +91,6 @@ async def display_profile(interaction: discord.Interaction):
         f"display_profile: Received display profile request from {interaction.user}"
     )
     try:
-        supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
         response = (
             supabase.table("hacker")
             .select("*")
@@ -112,13 +105,11 @@ async def display_profile(interaction: discord.Interaction):
             "An error occurred while displaying your profile.", ephemeral=True
         )
         return
-    if not response:
+    if not response.data:
         logging.info(f"display_profile: No profile found for {interaction.user}")
         await interaction.response.send_message("No profile found.", ephemeral=True)
         return
     logging.info(f"display_profile: Displaying profile for {interaction.user}")
-    # Untested formatting
-    # print(f"ID: {response.data[0]['id']}")
     profile_string = f"ID: {response.data[0]['id']}\nUsername: {response.data[0]['username']}\nSkills: {response.data[0]['skills']}\nJoined at: {response.data[0]['joined_at']}\nJoined matchmaking: {bool(response.data[0]['joined_matchmaking'])}\nMatchmade: {bool(response.data[0]['matchmade'])}"
     await interaction.response.send_message(profile_string, ephemeral=True)
 
