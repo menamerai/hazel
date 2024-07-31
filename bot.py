@@ -37,10 +37,16 @@ class Interests(discord.ui.Modal, title="Interests"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        print("Inputted interests: ", self.interests.value)
-        await interaction.response.send_message(
-            f"Thanks for inputting your interests!", ephemeral=True
-        )
+        try:
+            print("Inputted interests: ", self.interests.value)
+            await interaction.response.send_message(f"Interests saved!", ephemeral=True)
+            supabase.table("hacker").update({"interests": self.interests.value}).eq(
+                "username", interaction.user.name
+            ).execute()
+        except Exception as e:
+            logging.error(
+                f"interests: Error saving {interaction.user}'s interests: {e}"
+            )
 
     async def on_error(
         self, interaction: discord.Interaction, error: Exception
@@ -49,7 +55,6 @@ class Interests(discord.ui.Modal, title="Interests"):
             "Oops! Something went wrong.", ephemeral=True
         )
 
-        # Make sure we know what the error actually is
         logging.info(type(error), error, error.__traceback__)
 
 
@@ -186,7 +191,7 @@ async def display_profile(interaction: discord.Interaction):
     logging.info(f"display_profile: Displaying profile for {interaction.user}")
     parsed_skills = [skill["skill"] for skill in skills.data]
 
-    profile_string = f"ID: {hacker.data[0]['id']}\nUsername: {hacker.data[0]['username']}\nSkills: {parsed_skills}\nJoined at: {hacker.data[0]['joined_at']}\nJoined matchmaking: {bool(hacker.data[0]['joined_matchmaking'])}\nMatchmade: {bool(hacker.data[0]['matchmade'])}"
+    profile_string = f"ID: {hacker.data[0]['id']}\nUsername: {hacker.data[0]['username']}\nSkills: {parsed_skills}\nInterests: \"{hacker.data[0]['interests']}\"\nJoined at: {hacker.data[0]['joined_at']}\nJoined matchmaking: {bool(hacker.data[0]['joined_matchmaking'])}\nMatchmade: {bool(hacker.data[0]['matchmade'])}"
     await interaction.response.send_message(profile_string, ephemeral=True)
 
 
