@@ -38,7 +38,7 @@ class Interests(discord.ui.Modal, title="Interests"):
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
-            logging.log("Inputted interests: ", self.interests.value)
+            logging.info("Inputted interests: ", self.interests.value)
             await interaction.response.send_message(f"Interests saved!", ephemeral=True)
             supabase.table("hacker").update({"interests": self.interests.value}).eq(
                 "username", interaction.user.name
