@@ -38,7 +38,7 @@ class Interests(discord.ui.Modal, title="Interests"):
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
-            print("Inputted interests: ", self.interests.value)
+            logging.log("Inputted interests: ", self.interests.value)
             await interaction.response.send_message(f"Interests saved!", ephemeral=True)
             supabase.table("hacker").update({"interests": self.interests.value}).eq(
                 "username", interaction.user.name
@@ -109,11 +109,11 @@ async def register(interaction: discord.Interaction):
         )
 
         if hacker.data:
-            roles = [i.name.lower() for i in interaction.user.roles]
+            roles = [i.name for i in interaction.user.roles]
             print("Roles: ", roles)
 
             for role in roles:
-                if role not in structure_roles:
+                if role.lower() not in structure_roles:
                     response = (
                         supabase.table("skills")
                         .insert({"user_id": hacker.data[0]["id"], "skill": role})
