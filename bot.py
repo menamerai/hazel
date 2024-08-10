@@ -38,7 +38,7 @@ class Interests(discord.ui.Modal, title="Interests"):
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
-            logging.info("Inputted interests: ", self.interests.value)
+            logging.info(f"Inputted interests: {self.interests.value}")
             await interaction.response.send_message(f"Interests saved!", ephemeral=True)
             supabase.table("hacker").update({"interests": self.interests.value}).eq(
                 "username", interaction.user.name
@@ -143,6 +143,23 @@ async def register(interaction: discord.Interaction):
 async def unregister(interaction: discord.Interaction):
     logging.info(f"unregister: Received unregister request from {interaction.user}")
     try:
+        # get the hacker id, then delete the hacker and their skills
+        hacker = (
+            supabase.table("hacker")
+            .select("*")
+            .eq("username", interaction.user.name)
+            .execute()
+        )
+        if hasattr(hacker, "data") and hacker.data:
+            skills = (
+                supabase.table("skills")
+                .select("*")
+                .eq("user_id", hacker.data[0]["id"])
+                .execute()
+            )
+            for skill in skills.data:
+                supabase.table("skills").delete().eq("id", skill["id"]).execute()
+
         supabase.table("hacker").delete().eq(
             "username", interaction.user.name
         ).execute()
