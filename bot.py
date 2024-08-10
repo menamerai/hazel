@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import random
 from datetime import datetime
 from sys import stdout
 
@@ -9,6 +10,8 @@ from discord import app_commands
 from discord.ext import commands
 from dotenv import load_dotenv
 from supabase import Client, create_client
+
+from hazel.utils.users import check_if_user_exists
 
 load_dotenv()
 
@@ -29,38 +32,30 @@ logging.basicConfig(
 
 class Interests(discord.ui.Modal, title="Interests"):
     interests = discord.ui.TextInput(
-        label="List out your interests.",
-        style=discord.TextStyle.long,
-        placeholder="Type your interests here...",
-        required=True,
-        max_length=300,
+        label="What would you like to build?",
+        style=discord.TextStyle.paragraph,
+        placeholder="Ex: Web Development, Machine Learning, etc.",
+        required=False,
+        default="",
     )
 
-    async def on_submit(self, interaction: discord.Interaction):
-        try:
-            logging.info(f"Inputted interests: {self.interests.value}")
-            await interaction.response.send_message(f"Interests saved!", ephemeral=True)
-            supabase.table("hacker").update({"interests": self.interests.value}).eq(
-                "username", interaction.user.name
-            ).execute()
-        except Exception as e:
-            logging.error(
-                f"interests: Error saving {interaction.user}'s interests: {e}"
-            )
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        logging.info(f"Inputted interests: {self.interests.value}")
+        # TODO: check if input is toxic
+        supabase.table("hacker").update({"interests": self.interests.value}).eq(
+            "username", interaction.user.name
+        ).execute()
+        await interaction.response.send_message("Interests saved!", ephemeral=True)
 
     async def on_error(
         self, interaction: discord.Interaction, error: Exception
     ) -> None:
-        await interaction.response.send_message(
-            "Oops! Something went wrong.", ephemeral=True
+        logging.error(
+            f"interests: Error saving {interaction.user}'s interests: {error}"
         )
-
-        logging.info(type(error), error, error.__traceback__)
-
-
-@client.tree.command(name="interests", description="Submit what your interests are.")
-async def interests(interaction: discord.Interaction):
-    await interaction.response.send_modal(Interests())
+        await interaction.response.send_message(
+            "An error occurred while saving your interests.", ephemeral=True
+        )
 
 
 @client.event
@@ -99,30 +94,24 @@ async def register(interaction: discord.Interaction):
     ]
     logging.info(f"register: Received register request from {interaction.user}")
     try:
-        supabase.table("hacker").insert({"username": interaction.user.name}).execute()
+        # Check if user is already registered
+        if check_if_user_exists(supabase, interaction.user.name):
+            logging.warning(f"register: {interaction.user} is already registered.")
+            await interaction.response.send_message(
+                "You are already registered.", ephemeral=True
+            )
+            return
 
-        hacker = (
-            supabase.table("hacker")
-            .select("*")
-            .eq("username", interaction.user.name)
-            .execute()
-        )
+        skills = [
+            i.name for i in interaction.user.roles if i.name not in structure_roles
+        ]
+        supabase.table("hacker").insert(
+            {"username": interaction.user.name, "skills": skills}
+        ).execute()
 
-        if hacker.data:
-            roles = [i.name for i in interaction.user.roles]
-            print("Roles: ", roles)
-
-            for role in roles:
-                if role.lower() not in structure_roles:
-                    response = (
-                        supabase.table("skills")
-                        .insert({"user_id": hacker.data[0]["id"], "skill": role})
-                        .execute()
-                    )
-                    print("Response: ", response.data)
     except Exception as e:
         logging.error(f"register: Error registering {interaction.user}: {e}")
-        # 23505 - User is already registered
+        # 23505 - User is already registered, violation of unique constraint
         if e.code == "23505":
             await interaction.response.send_message(
                 "You are already registered.", ephemeral=True
@@ -133,83 +122,138 @@ async def register(interaction: discord.Interaction):
             "An error occurred while registering.", ephemeral=True
         )
         return
-    logging.info(f"register: Registered {interaction.user} as a hacker")
-    await interaction.response.send_message("Registered as a hacker.", ephemeral=True)
+
+    logging.info(f"register: Registered {interaction.user} as a hacker.")
+    await interaction.response.send_message(
+        "Registered as a hacker. You should now do /edit_interests to add your interests.",
+        ephemeral=True,
+    )
 
 
-@client.tree.command(
-    name="unregister", description="Unregister as a hacker for matchmaking."
-)
+@client.tree.command(name="edit_interests", description="Edit what your interests are.")
+async def edit_interests(interaction: discord.Interaction):
+    # Check if user is already registered
+    if not check_if_user_exists(supabase, interaction.user.name):
+        logging.warning(f"edit_interests: {interaction.user} is not registered.")
+        await interaction.response.send_message(
+            "You are not registered. Please do /register first.", ephemeral=True
+        )
+        return
+
+    logging.info(
+        f"edit_interests: Received edit interests request from {interaction.user}"
+    )
+    try:
+        await interaction.response.send_modal(Interests())
+    except Exception as e:
+        logging.error(
+            f"edit_interests: Error editing {interaction.user}'s interests: {e}"
+        )
+        await interaction.response.send_message(
+            "An error occurred while editing your interests.", ephemeral=True
+        )
+
+
+@client.tree.command(name="unregister", description="Unregister as a hacker.")
 async def unregister(interaction: discord.Interaction):
     logging.info(f"unregister: Received unregister request from {interaction.user}")
     try:
-        # get the hacker id, then delete the hacker and their skills
-        hacker = (
+        # Check if user is already registered
+        user = (
             supabase.table("hacker")
-            .select("*")
+            .select("id")
             .eq("username", interaction.user.name)
             .execute()
         )
-        if hasattr(hacker, "data") and hacker.data:
-            skills = (
-                supabase.table("skills")
-                .select("*")
-                .eq("user_id", hacker.data[0]["id"])
-                .execute()
+        if not user.data:
+            logging.warning(f"unregister: {interaction.user} is not registered.")
+            await interaction.response.send_message(
+                "You are not registered.", ephemeral=True
             )
-            for skill in skills.data:
-                supabase.table("skills").delete().eq("id", skill["id"]).execute()
+            return
 
         supabase.table("hacker").delete().eq(
             "username", interaction.user.name
         ).execute()
+
     except Exception as e:
         logging.error(f"unregister: Error unregistering {interaction.user}: {e}")
         await interaction.response.send_message(
             "An error occurred while unregistering.", ephemeral=True
         )
         return
-    logging.info(f"unregister: Unregistered {interaction.user} as a hacker")
+
+    logging.info(f"unregister: Unregistered {interaction.user} as a hacker.")
     await interaction.response.send_message("Unregistered as a hacker.", ephemeral=True)
 
 
-@client.tree.command(name="display_profile", description="Display your profile.")
-async def display_profile(interaction: discord.Interaction):
+@client.tree.command(name="join_matchmaking", description="Join the matchmaking queue.")
+async def join_matchmaking(interaction: discord.Interaction):
     logging.info(
-        f"display_profile: Received display profile request from {interaction.user}"
+        f"join_matchmaking: Received join matchmaking request from {interaction.user}"
     )
     try:
-        hacker = (
-            supabase.table("hacker")
-            .select("*")
-            .eq("username", interaction.user.name)
-            .execute()
-        )
+        # Check if user is already registered
+        if not check_if_user_exists(supabase, interaction.user.name):
+            logging.warning(f"join_matchmaking: {interaction.user} is not registered.")
+            await interaction.response.send_message(
+                "You are not registered. Please do /register first.", ephemeral=True
+            )
+            return
 
-        skills = (
-            supabase.table("skills")
-            .select("*")
-            .eq("user_id", hacker.data[0]["id"])
-            .execute()
-        )
+        # set the joined_matchmaking flag to true
+        supabase.table("hacker").update({"joined_matchmaking": True}).eq(
+            "username", interaction.user.name
+        ).execute()
+
     except Exception as e:
         logging.error(
-            f"display_profile: Error displaying profile for {interaction.user}: {e}"
+            f"join_matchmaking: Error joining matchmaking queue {interaction.user}: {e}"
         )
         await interaction.response.send_message(
-            "An error occurred while displaying your profile.", ephemeral=True
+            "An error occurred while joining the matchmaking queue.", ephemeral=True
         )
         return
 
-    if not hacker.data:
-        logging.info(f"display_profile: No profile found for {interaction.user}")
-        await interaction.response.send_message("No profile found.", ephemeral=True)
-        return
-    logging.info(f"display_profile: Displaying profile for {interaction.user}")
-    parsed_skills = [skill["skill"] for skill in skills.data]
+    logging.info(f"join_matchmaking: Joined matchmaking queue {interaction.user}.")
+    await interaction.response.send_message(
+        "Joined matchmaking queue. You will be matched with other hackers soon.",
+        ephemeral=True,
+    )
 
-    profile_string = f"ID: {hacker.data[0]['id']}\nUsername: {hacker.data[0]['username']}\nSkills: {parsed_skills}\nInterests: \"{hacker.data[0]['interests']}\"\nJoined at: {hacker.data[0]['joined_at']}\nJoined matchmaking: {bool(hacker.data[0]['joined_matchmaking'])}\nMatchmade: {bool(hacker.data[0]['matchmade'])}"
-    await interaction.response.send_message(profile_string, ephemeral=True)
+
+@client.tree.command(
+    name="leave_matchmaking", description="Leave the matchmaking queue."
+)
+async def leave_matchmaking(interaction: discord.Interaction):
+    logging.info(
+        f"leave_matchmaking: Received leave matchmaking request from {interaction.user}"
+    )
+    try:
+        # Check if user is already registered
+        if not check_if_user_exists(supabase, interaction.user.name):
+            logging.warning(f"leave_matchmaking: {interaction.user} is not registered.")
+            await interaction.response.send_message(
+                "You are not registered. Please do /register first.", ephemeral=True
+            )
+            return
+
+        # set the joined_matchmaking flag to false
+        supabase.table("hacker").update({"joined_matchmaking": False}).eq(
+            "username", interaction.user.name
+        ).execute()
+
+    except Exception as e:
+        logging.error(
+            f"leave_matchmaking: Error leaving matchmaking queue {interaction.user}: {e}"
+        )
+        await interaction.response.send_message(
+            "An error occurred while leaving the matchmaking queue.", ephemeral=True
+        )
+        return
+
+    logging.info(f"leave_matchmaking: Left matchmaking queue {interaction.user}.")
+    await interaction.response.send_message("Left matchmaking queue.", ephemeral=True)
 
 
 async def main():
