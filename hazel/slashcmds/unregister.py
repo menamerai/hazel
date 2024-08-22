@@ -1,8 +1,9 @@
 import logging
+import os
 
 import discord
 from discord import app_commands
-from dotenv import dotenv_values
+from dotenv import load_dotenv
 from supabase import Client
 
 from hazel.services.supabase_client import supabase_client
@@ -60,10 +61,9 @@ class Unregister(app_commands.Group):
             f"Unregister.mentor: received unregister request from {interaction.user}"
         )
         supabase: Client = self.extras["supabase"]
-        env: dict[str, str] = self.extras["dotenv"]
 
         # Check if password is correct
-        if password != env["MENTOR_PASSWORD"]:
+        if password != os.getenv("MENTOR_PASSWORD"):
             logging.warning(
                 f"Unregister.mentor: {interaction.user} entered the wrong password"
             )
@@ -111,10 +111,11 @@ class Unregister(app_commands.Group):
 
 async def setup(client: discord.Client):
     logging.info("Unregister: registering slash command")
+    load_dotenv()
     client.tree.add_command(
         Unregister(
             name="unregister",
             description="Unregister a user for the event",
-            extras={"supabase": supabase_client, "dotenv": dotenv_values()},
+            extras={"supabase": supabase_client},
         )
     )
