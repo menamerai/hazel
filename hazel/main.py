@@ -11,6 +11,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
+from hazel.utils.channels import random_channel_name
 from hazel.utils.users import check_if_user_exists
 
 load_dotenv()
@@ -254,6 +255,76 @@ async def leave_matchmaking(interaction: discord.Interaction):
 
     logging.info(f"leave_matchmaking: Left matchmaking queue {interaction.user}.")
     await interaction.response.send_message("Left matchmaking queue.", ephemeral=True)
+
+
+# TODO: add parameter to specify the maximum members in a team
+@client.tree.command(
+    name="start_random_matchmaking", description="Start random matchmaking."
+)
+async def start_random_matchmaking(interaction: discord.Interaction):
+    # make sure the user has the Web role
+    if "web" not in [i.name.lower() for i in interaction.user.roles]:
+        logging.warning(
+            f"start_random_matchmaking: {interaction.user} does not have the Web role."
+        )
+        await interaction.response.send_message(
+            "You do not have the Web role. Only people with the Web role can start the matchmaking process.",
+            ephemeral=True,
+        )
+        return
+
+    logging.info(
+        f"start_random_matchmaking: Received start random matchmaking request from {interaction.user}"
+    )
+
+    try:
+        # get all hackers who have joined the matchmaking queue
+        hackers = (
+            supabase.table("hacker")
+            .select("username")
+            .eq("joined_matchmaking", True)
+            .execute()
+        )
+        hackers = hackers.data
+
+        # shuffle the hackers
+        random.shuffle(hackers)
+
+        # match the hackers in maximum teams of 4
+        teams = [hackers[i : i + 4] for i in range(0, len(hackers), 4)]
+
+        # TODO: proper error handling here, lots of things can go wrong
+        # create a new text channel and voice channel for each team
+        for team in teams:
+            team_name = random_channel_name()
+            # check if a channel with the same name already exists
+            while discord.utils.get(
+                interaction.guild.text_channels, name=team_name
+            ) or discord.utils.get(interaction.guild.voice_channels, name=team_name):
+                team_name = random_channel_name()
+            logging.info(
+                f"start_random_matchmaking: Creating team {team_name} for {team}"
+            )
+            category = discord.utils.get(interaction.guild.categories, name="Teams")
+            text_channel = await interaction.guild.create_text_channel(
+                team_name, category=category
+            )
+            voice_channel = await interaction.guild.create_voice_channel(
+                team_name, category=category
+            )
+            for hacker in team:
+                user = interaction.guild.get_member_named(hacker["username"])
+                await text_channel.set_permissions(user, read_messages=True)
+                await voice_channel.set_permissions(user, view_channel=True)
+
+    except Exception as e:
+        logging.error(
+            f"start_random_matchmaking: Error starting random matchmaking {interaction.user}: {e}"
+        )
+        await interaction.response.send_message(
+            "An error occurred while starting random matchmaking.", ephemeral=True
+        )
+        return
 
 
 async def main():
