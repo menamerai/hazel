@@ -1,8 +1,9 @@
 import logging
+import os
 
 import discord
 from discord import app_commands
-from dotenv import dotenv_values
+from dotenv import load_dotenv
 from supabase import Client
 
 from hazel.services.supabase_client import supabase_client
@@ -86,11 +87,10 @@ class Update(app_commands.Group):
     async def mentor(self, interaction: discord.Interaction, password: str):
         logging.info(f"Update.mentor: received update request from {interaction.user}")
         supabase: Client = self.extras["supabase"]
-        env: dict[str, str] = self.extras["dotenv"]
         discord_client: discord.Client = self.extras["client"]
 
         # Check if password is correct
-        if password != env["MENTOR_PASSWORD"]:
+        if password != os.getenv("MENTOR_PASSWORD"):
             logging.warning(
                 f"Register.mentor: {interaction.user} entered an incorrect password"
             )
@@ -159,13 +159,13 @@ class Update(app_commands.Group):
 
 async def setup(client: discord.Client):
     logging.info("Update: registering slash command")
+    load_dotenv()
     client.tree.add_command(
         Update(
             name="update",
             description="Update existing information in the event database",
             extras={
                 "supabase": supabase_client,
-                "dotenv": dotenv_values(),
                 "client": client,
             },
         )

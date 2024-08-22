@@ -1,8 +1,9 @@
 import logging
+import os
 
 import discord
 from discord import app_commands
-from dotenv import dotenv_values
+from dotenv import load_dotenv
 from supabase import Client
 
 from hazel.services.supabase_client import supabase_client
@@ -61,10 +62,9 @@ class Display(app_commands.Group):
             f"Display.mentor: received display request from {interaction.user}"
         )
         supabase: Client = self.extras["supabase"]
-        env: dict[str, str] = self.extras["dotenv"]
 
         # Check if password is correct
-        if password != env["MENTOR_PASSWORD"]:
+        if password != os.getenv("MENTOR_PASSWORD"):
             logging.warning(
                 f"Display.mentor: {interaction.user} entered an incorrect password"
             )
@@ -114,13 +114,13 @@ class Display(app_commands.Group):
 
 async def setup(client: discord.Client):
     logging.info("Display: registering slash command")
+    load_dotenv()
     client.tree.add_command(
         Display(
             name="display",
             description="Display user information from the event database",
             extras={
                 "supabase": supabase_client,
-                "dotenv": dotenv_values(),
                 "client": client,
             },
         )
