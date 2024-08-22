@@ -1,19 +1,13 @@
 import asyncio
 import logging
 import os
-import random
 from datetime import datetime
 from sys import stdout
 
 import discord
-from discord import app_commands
 from discord.ext import commands
 from dotenv import load_dotenv
-from supabase import Client, create_client
-
-from hazel.utils.channels import random_channel_name
-from hazel.utils.constants import STRUCTURE_ROLES
-from hazel.utils.users import check_if_user_exists, check_root_leaf_branch
+from supabase import create_client
 
 load_dotenv()
 
@@ -37,7 +31,9 @@ async def on_ready():
     logging.info(f"on_ready: {client.user} is connecting to Discord...")
     await client.load_extension("hazel.slashcmds.register")
     # TODO: remove this line when bot is ready for production
-    await client.load_extension("hazel.slashcmds.unregister")
+    # await client.load_extension("hazel.slashcmds.unregister")
+    # await client.load_extension("hazel.slashcmds.display")
+    await client.load_extension("hazel.slashcmds.update")
     # sync current commands with the fodh server for quick development
     client.tree.copy_global_to(guild=discord.Object(id=os.getenv("FODH_GUILD_ID")))
     await client.tree.sync(guild=discord.Object(id=os.getenv("FODH_GUILD_ID")))

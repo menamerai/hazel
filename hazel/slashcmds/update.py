@@ -10,24 +10,25 @@ from hazel.utils.constants import *
 from hazel.utils.users import check_if_user_exists, check_root_leaf_branch
 
 
-class Register(app_commands.Group):
-    @app_commands.command(description="Register as a hacker for the event")
+class Update(app_commands.Group):
+    @app_commands.command(
+        description="Update skills, root, branch and leaf in the event database for hackers"
+    )
     async def hacker(self, interaction: discord.Interaction):
-        logging.info(
-            f"Register.hacker: received register request from {interaction.user}"
-        )
+        logging.info("Update.hacker: received update request from {interaction.user}")
         supabase: Client = self.extras["supabase"]
         discord_client: discord.Client = self.extras["client"]
 
         # Check if user exists in the database
-        if check_if_user_exists(
+        if not check_if_user_exists(
             client=supabase, username=interaction.user.name, table="hacker"
         ):
             logging.warning(
-                f"Register.hacker: {interaction.user} is already registered for the event"
+                f"Update.hacker: {interaction.user} is not registered for the event"
             )
             await interaction.response.send_message(
-                "You are already registered for the event", ephemeral=True
+                "You are not registered for the event. Try /register hacker",
+                ephemeral=True,
             )
             return
 
@@ -35,56 +36,55 @@ class Register(app_commands.Group):
         user_roles = [role.name.lower() for role in interaction.user.roles]
         if not check_root_leaf_branch(user_roles):
             logging.warning(
-                f"Register.hacker: {interaction.user} does not have the required roles. Roles: {user_roles}"
+                f"Update.hacker: {interaction.user} does not have the required roles. Roles: {user_roles}"
             )
             reaction_roles_channel = discord.utils.get(
                 discord_client.get_all_channels(), name="🎭reaction-roles"
             )
             await interaction.response.send_message(
-                f"You do not have the required roles to register for the event. Please make sure you have exactly one root role, one leaf role, and one branch role. Modify your roles by reacting at {reaction_roles_channel.mention} and try again, or contact an organizer.",
+                f"You do not have the required roles to update for the event. Please make sure you have exactly one root role, one leaf role, and one branch role. Modify your roles by reacting at {reaction_roles_channel.mention} and try again, or contact an organizer.",
                 ephemeral=True,
             )
             return
 
-        # Register user
-        logging.info(f"Register.hacker: registering {interaction.user} for the event")
+        # Update user skills
+        logging.info(
+            f"Update.hacker: updating {interaction.user}'s skills for the event"
+        )
         try:
             skills = [i for i in user_roles if i not in STRUCTURE_ROLES]
             root = [i for i in user_roles if i in ROOT_ROLES][0]
             leaf = [i for i in user_roles if i in LEAF_ROLES][0]
             branch = [i for i in user_roles if i in BRANCH_ROLES][0]
-            supabase.table("hacker").insert(
+            supabase.table("hacker").update(
                 {
-                    "username": interaction.user.name,
                     "root": root,
                     "leaf": leaf,
                     "branch": branch,
                     "skills": skills,
                 }
-            ).execute()
-            logging.info(f"Register.hacker: {interaction.user} registered successfully")
-            # give hacker role
-            if "hacker" not in user_roles:
-                hacker_role = discord.utils.get(interaction.guild.roles, name="Hacker")
-                await interaction.user.add_roles(hacker_role)
+            ).eq("username", interaction.user.name).execute()
+            logging.info(
+                f"Update.hacker: {interaction.user}'s skills updated successfully"
+            )
             await interaction.response.send_message(
-                "You have been registered for the event", ephemeral=True
+                "Your skills, root, branch and leaf have been updated", ephemeral=True
             )
         except Exception as e:
             logging.error(
-                f"Register.hacker: error while registering {interaction.user} for the event: {e}"
+                f"Update.hacker: error while updating {interaction.user}'s skills for the event: {e}"
             )
             await interaction.response.send_message(
-                "An error occurred while registering you for the event. Please try again later.",
+                "An error occurred while updating your skills for the event. Please try again later.",
                 ephemeral=True,
             )
 
-    @app_commands.command(description="Register as a mentor for the event")
+    @app_commands.command(
+        description="Update root, branch and leaf in the event database for mentors"
+    )
     @app_commands.describe(password="Password provided by an organizer")
     async def mentor(self, interaction: discord.Interaction, password: str):
-        logging.info(
-            f"Register.mentor: received register request from {interaction.user}"
-        )
+        logging.info(f"Update.mentor: received update request from {interaction.user}")
         supabase: Client = self.extras["supabase"]
         env: dict[str, str] = self.extras["dotenv"]
         discord_client: discord.Client = self.extras["client"]
@@ -101,14 +101,15 @@ class Register(app_commands.Group):
             return
 
         # Check if user exists in the database
-        if check_if_user_exists(
+        if not check_if_user_exists(
             client=supabase, username=interaction.user.name, table="mentor"
         ):
             logging.warning(
-                f"Register.mentor: {interaction.user} is already registered for the event"
+                f"Register.mentor: {interaction.user} is not registered for the event"
             )
             await interaction.response.send_message(
-                "You are already registered for the event", ephemeral=True
+                "You are not registered for the event. Try /register mentor password:<insert password given>",
+                ephemeral=True,
             )
             return
 
@@ -127,27 +128,24 @@ class Register(app_commands.Group):
             )
             return
 
-        # Register user
-        logging.info(f"Register.mentor: registering {interaction.user} for the event")
+        # Update user info
+        logging.info(f"Update.mentor: updating {interaction.user}'s info for the event")
         try:
             root = [i for i in user_roles if i in ROOT_ROLES][0]
             leaf = [i for i in user_roles if i in LEAF_ROLES][0]
             branch = [i for i in user_roles if i in BRANCH_ROLES][0]
-            supabase.table("mentor").insert(
+            supabase.table("mentor").update(
                 {
-                    "username": interaction.user.name,
                     "root": root,
                     "leaf": leaf,
                     "branch": branch,
                 }
-            ).execute()
-            logging.info(f"Register.mentor: {interaction.user} registered successfully")
-            # give mentor role
-            if "mentor" not in user_roles:
-                mentor_role = discord.utils.get(interaction.guild.roles, name="Mentor")
-                await interaction.user.add_roles(mentor_role)
+            ).eq("username", interaction.user.name).execute()
+            logging.info(
+                f"Update.mentor: {interaction.user}'s skills updated successfully"
+            )
             await interaction.response.send_message(
-                "You have been registered for the event", ephemeral=True
+                "Your root, branch and leaf have been updated", ephemeral=True
             )
         except Exception as e:
             logging.error(
@@ -160,11 +158,11 @@ class Register(app_commands.Group):
 
 
 async def setup(client: discord.Client):
-    logging.info("Register: registering slash command")
+    logging.info("Update: registering slash command")
     client.tree.add_command(
-        Register(
-            name="register",
-            description="Register a user for the event",
+        Update(
+            name="update",
+            description="Update existing information in the event database",
             extras={
                 "supabase": supabase_client,
                 "dotenv": dotenv_values(),

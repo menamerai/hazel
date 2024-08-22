@@ -54,9 +54,7 @@ class Unregister(app_commands.Group):
             )
 
     @app_commands.command()
-    @app_commands.describe(
-        password="Password to unregister as a mentor, the same one provided by an organizer"
-    )
+    @app_commands.describe(password="Password provided by an organizer")
     async def mentor(self, interaction: discord.Interaction, password: str):
         logging.info(
             f"Unregister.mentor: received unregister request from {interaction.user}"
