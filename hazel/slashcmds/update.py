@@ -115,7 +115,7 @@ class Update(app_commands.Group):
 
         # Check if user has exactly 1 root role, 1 leaf role, and 1 branch role
         user_roles = [role.name.lower() for role in interaction.user.roles]
-        if not check_root_leaf_branch(user_roles):
+        if not check_root_leaf_branch(user_roles, count_leaf=False):
             logging.warning(
                 f"Register.mentor: {interaction.user} does not have the required roles. Roles: {user_roles}"
             )
@@ -123,7 +123,7 @@ class Update(app_commands.Group):
                 discord_client.get_all_channels(), name="🎭reaction-roles"
             )
             await interaction.response.send_message(
-                f"You do not have the required roles to register for the event. Please make sure you have exactly one root role, one leaf role, and one branch role. Modify your roles by reacting at {reaction_roles_channel.mention} and try again, or contact an organizer.",
+                f"You do not have the required roles to register for the event. Please make sure you have exactly one root role and one branch role. Modify your roles by reacting at {reaction_roles_channel.mention} and try again, or contact an organizer.",
                 ephemeral=True,
             )
             return
@@ -132,12 +132,10 @@ class Update(app_commands.Group):
         logging.info(f"Update.mentor: updating {interaction.user}'s info for the event")
         try:
             root = [i for i in user_roles if i in ROOT_ROLES][0]
-            leaf = [i for i in user_roles if i in LEAF_ROLES][0]
             branch = [i for i in user_roles if i in BRANCH_ROLES][0]
             supabase.table("mentor").update(
                 {
                     "root": root,
-                    "leaf": leaf,
                     "branch": branch,
                 }
             ).eq("username", interaction.user.name).execute()
