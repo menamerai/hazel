@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime
 
 import discord
 from discord import app_commands
@@ -19,6 +20,16 @@ class Register(app_commands.Group):
         )
         supabase: Client = self.extras["supabase"]
         discord_client: discord.Client = self.extras["client"]
+
+        # check if it is currently 8AM August 24th 2024
+        if datetime.now() < datetime(2024, 8, 24, 8, 0, 0):
+            logging.warning(
+                f"Register.hacker: {interaction.user} tried to register before the event started"
+            )
+            await interaction.response.send_message(
+                "The event has not started yet. Please try again later.", ephemeral=True
+            )
+            return
 
         # Check if user exists in the database
         if check_if_user_exists(
