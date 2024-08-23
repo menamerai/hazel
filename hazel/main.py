@@ -32,6 +32,7 @@ async def on_ready():
     await client.load_extension("hazel.slashcmds.hacker")
     await client.load_extension("hazel.slashcmds.mentor")
     await client.load_extension("hazel.slashcmds.team")
+    await client.load_extension("hazel.slashcmds.matchmake")
     # sync current commands with the fodh server for quick development
     client.tree.copy_global_to(guild=discord.Object(id=os.getenv("FODH_GUILD_ID")))
     await client.tree.sync(guild=discord.Object(id=os.getenv("FODH_GUILD_ID")))
