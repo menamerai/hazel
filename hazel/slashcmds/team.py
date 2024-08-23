@@ -566,6 +566,7 @@ class Team(app_commands.Group):
         # add member to team
         logging.info(f"Team.add: adding {user} to {interaction.user}'s team")
         try:
+            logging.info(f"Team.add: current members: {members.data[0]['members']}")
             supabase.table("team").update(
                 {
                     "members": [user] + members.data[0]["members"],
@@ -677,6 +678,7 @@ class Team(app_commands.Group):
         # remove member from team
         logging.info(f"Team.remove: removing {user} from {interaction.user}'s team")
         try:
+            logging.info(f"Team.remove: current members: {members.data[0]['members']}")
             supabase.table("team").update(
                 {
                     "members": members.data[0]["members"].remove(user),
@@ -768,6 +770,7 @@ class Team(app_commands.Group):
                 .eq("leader", interaction.user.name)
                 .execute()
             )
+            logging.info(f"Team.leave: current members: {members.data[0]['members']}")
             supabase.table("team").update(
                 {
                     "members": members.data[0]["members"].remove(interaction.user.name),
