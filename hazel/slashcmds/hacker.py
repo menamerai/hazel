@@ -19,7 +19,7 @@ class Hacker(app_commands.Group):
         )
         supabase: Client = self.extras["supabase"]
 
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         # check if it is currently 8AM August 24th 2024
         if datetime.now() < datetime(2024, 8, 24, 8, 0, 0):
@@ -96,7 +96,7 @@ class Hacker(app_commands.Group):
         logging.info(f"Hacker.update: received update request from {interaction.user}")
         supabase: Client = self.extras["supabase"]
 
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         # Check if user exists in the database
         if not check_if_user_exists(
@@ -165,7 +165,7 @@ class Hacker(app_commands.Group):
         )
         supabase: Client = self.extras["supabase"]
 
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         # Check if user exists in the database
         if not check_if_user_exists(
