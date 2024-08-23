@@ -229,7 +229,7 @@ class Mentor(app_commands.Group):
 
 
 async def setup(client: discord.Client):
-    logging.info("Register: registering slash command")
+    logging.info("Mentor: registering slash command")
     load_dotenv()
     client.tree.add_command(
         Mentor(
