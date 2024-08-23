@@ -19,7 +19,7 @@ class Mentor(app_commands.Group):
         )
         supabase: Client = self.extras["supabase"]
 
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         # check if the password is correct
         if password != os.getenv("MENTOR_PASSWORD"):
@@ -95,7 +95,7 @@ class Mentor(app_commands.Group):
         logging.info(f"Mentor.update: received update request from {interaction.user}")
         supabase: Client = self.extras["supabase"]
 
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         # check if the password is correct
         if password != os.getenv("MENTOR_PASSWORD"):
@@ -173,7 +173,7 @@ class Mentor(app_commands.Group):
         )
         supabase: Client = self.extras["supabase"]
 
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         # check if the password is correct
         if password != os.getenv("MENTOR_PASSWORD"):
