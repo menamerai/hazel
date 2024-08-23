@@ -3,13 +3,12 @@ from supabase import Client
 from hazel.utils.constants import BRANCH_ROLES, LEAF_ROLES, ROOT_ROLES
 
 
-def check_if_user_exists(client: Client, username: str, table: str) -> bool:
+def check_if_user_exists(
+    client: Client, username: str, table: str, column: str = "username"
+) -> bool:
     # Check if user exists in the database
     users = (
-        client.table(table)
-        .select("id", count="exact")
-        .eq("username", username)
-        .execute()
+        client.table(table).select("id", count="exact").eq(column, username).execute()
     )
     if hasattr(users, "count") and users.count > 0:
         return True

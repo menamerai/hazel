@@ -1,0 +1,1074 @@
+import logging
+from datetime import datetime
+
+import discord
+from discord import app_commands
+from dotenv import load_dotenv
+from supabase import Client
+
+from hazel.services.supabase_client import supabase_client
+from hazel.utils.constants import *
+from hazel.utils.users import check_if_user_exists
+
+
+async def create_team(
+    interaction: discord.Interaction,
+    supabase: Client,
+    root: str,
+    branch: str,
+    leaf: str,
+):
+    logging.info(
+        f"create_team: creating team for {interaction.user} with root: {root}, branch: {branch}, and leaf: {leaf}"
+    )
+    supabase.table("team").insert(
+        {
+            "leader": interaction.user.name,
+            "root": root,
+            "branch": branch,
+            "leaf": leaf,
+        }
+    ).execute()
+    team_id = (
+        supabase.table("team")
+        .select("id")
+        .eq("leader", interaction.user.name)
+        .execute()
+        .data[0]["id"]
+    )
+    user_id = (
+        supabase.table("hacker")
+        .select("id")
+        .eq("username", interaction.user.name)
+        .execute()
+        .data[0]["id"]
+    )
+    supabase.table("team-membership").insert(
+        {
+            "team-id": team_id,
+            "username": interaction.user.name,
+            "user-id": user_id,
+            "leader": True,
+        }
+    ).execute()
+    logging.info(f"create_team: {interaction.user}'s team created successfully")
+    await interaction.response.send_message(
+        "Your team has been created.", ephemeral=True
+    )
+
+
+async def update_team(
+    interaction: discord.Interaction,
+    supabase: Client,
+    root: str,
+    branch: str,
+    leaf: str,
+):
+    logging.info(
+        f"update_team: updating team for {interaction.user} with root: {root}, branch: {branch}, and leaf: {leaf}"
+    )
+    team = (
+        supabase.table("team")
+        .select("id")
+        .eq("leader", interaction.user.name)
+        .execute()
+    )
+    team_id = team.data[0]["id"]
+    supabase.table("team").update(
+        {
+            "root": root,
+            "branch": branch,
+            "leaf": leaf,
+        }
+    ).eq("id", team_id).execute()
+    logging.info(f"update_team: {interaction.user}'s team updated successfully")
+    await interaction.response.send_message(
+        "Your team has been updated.", ephemeral=True
+    )
+
+
+class RootSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(
+                label="Software Root",
+                value="software hacker",
+                description="Software development, programming, and coding",
+                emoji="💻",
+            ),
+            discord.SelectOption(
+                label="Business/Creative Root",
+                value="pitch competition hacker",
+                description="Business, marketing, design, and creative",
+                emoji="💼",
+            ),
+        ]
+        super().__init__(
+            placeholder="Select your team's root",
+            options=options,
+            custom_id="root",
+            max_values=1,
+            min_values=1,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        root = self.values[0]
+        logging.info(f"RootSelect.callback: selected root: {root}")
+        self.view.root = root
+        self.view.root_answered = True
+
+        if (
+            self.view.root_answered
+            and self.view.branch_answered
+            and self.view.leaf_answered
+        ):
+            self.view.stop()
+
+            if self.view.mode == "edit":
+                await update_team(
+                    interaction=interaction,
+                    supabase=self.view.supabase,
+                    root=self.view.root,
+                    branch=self.view.branch,
+                    leaf=self.view.leaf,
+                )
+            else:
+                await create_team(
+                    interaction=interaction,
+                    supabase=self.view.supabase,
+                    root=self.view.root,
+                    branch=self.view.branch,
+                    leaf=self.view.leaf,
+                )
+        else:
+            await interaction.response.defer()
+
+
+class BranchSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(
+                label="Artificial Intelligence Branch",
+                value="ai track",
+                description="Machine learning, deep learning, and artificial intelligence",
+                emoji="🧠",
+            ),
+            discord.SelectOption(
+                label="Blockchain Branch",
+                value="blockchain track",
+                description="Cryptocurrency, smart contracts, and decentralized finance",
+                emoji="🟦",
+            ),
+            discord.SelectOption(
+                label="Data Visualization Branch",
+                value="data visualization track",
+                description="Data analysis, data visualization, and data science",
+                emoji="📊",
+            ),
+        ]
+        super().__init__(
+            placeholder="Select your team's branch",
+            options=options,
+            custom_id="branch",
+            max_values=1,
+            min_values=1,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        branch = self.values[0]
+        logging.info(f"BranchSelect.callback: selected branch: {branch}")
+        self.view.branch = branch
+        self.view.branch_answered = True
+
+        if (
+            self.view.root_answered
+            and self.view.branch_answered
+            and self.view.leaf_answered
+        ):
+            self.view.stop()
+            if self.view.mode == "edit":
+                await update_team(
+                    interaction=interaction,
+                    supabase=self.view.supabase,
+                    root=self.view.root,
+                    branch=self.view.branch,
+                    leaf=self.view.leaf,
+                )
+            else:
+                await create_team(
+                    interaction=interaction,
+                    supabase=self.view.supabase,
+                    root=self.view.root,
+                    branch=self.view.branch,
+                    leaf=self.view.leaf,
+                )
+        else:
+            await interaction.response.defer()
+
+
+class LeafSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(
+                label="Gaming Theme",
+                value="gaming theme",
+                description="Gaming, esports, and entertainment",
+                emoji="🎮",
+            ),
+            discord.SelectOption(
+                label="Security Theme",
+                value="security theme",
+                description="Cybersecurity, privacy, and digital rights",
+                emoji="🛡",
+            ),
+            discord.SelectOption(
+                label="Finance Theme",
+                value="finance theme",
+                description="Finance, fintech, and blockchain",
+                emoji="🏧",
+            ),
+            discord.SelectOption(
+                label="Social Impact Theme",
+                value="social impact theme",
+                description="Social impact, sustainability, and community",
+                emoji="🌍",
+            ),
+        ]
+        super().__init__(
+            placeholder="Select your team's leaf",
+            options=options,
+            custom_id="leaf",
+            max_values=1,
+            min_values=1,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        leaf = self.values[0]
+        logging.info(f"LeafSelect.callback: selected leaf: {leaf}")
+        self.view.leaf = leaf
+        self.view.leaf_answered = True
+
+        if (
+            self.view.root_answered
+            and self.view.branch_answered
+            and self.view.leaf_answered
+        ):
+            self.view.stop()
+            if self.view.mode == "edit":
+                await update_team(
+                    interaction=interaction,
+                    supabase=self.view.supabase,
+                    root=self.view.root,
+                    branch=self.view.branch,
+                    leaf=self.view.leaf,
+                )
+            else:
+                await create_team(
+                    interaction=interaction,
+                    supabase=self.view.supabase,
+                    root=self.view.root,
+                    branch=self.view.branch,
+                    leaf=self.view.leaf,
+                )
+        else:
+            await interaction.response.defer()
+
+
+class TeamCreate(discord.ui.View):
+    def __init__(self, supabase: Client, mode: str = "create"):
+        super().__init__(timeout=3000)
+        self.supabase = supabase
+        self.mode = mode
+        self.original_interaction: discord.Interaction | None = None
+        self.root: str = "software hacker"
+        self.branch: str = "ai track"
+        self.leaf: str = "social impact theme"
+        self.root_answered = False
+        self.branch_answered = False
+        self.leaf_answered = False
+        self.add_item(RootSelect())
+        self.add_item(BranchSelect())
+        self.add_item(LeafSelect())
+
+
+class Team(app_commands.Group):
+    @app_commands.command(description="Register as a hacker for the event")
+    async def create(self, interaction: discord.Interaction):
+        logging.info(
+            f"Team.create: received team creation request from {interaction.user}"
+        )
+        supabase: Client = self.extras["supabase"]
+
+        # defer the response to avoid timeout
+        await interaction.response.defer(ephemeral=True)
+
+        # check if it is currently 8AM August 24th 2024
+        if datetime.now() < datetime(2024, 8, 24, 8, 0, 0):
+            logging.warning(
+                f"Team.create: {interaction.user} tried to create a team before the event started"
+            )
+            await interaction.followup.send(
+                "The event has not started yet. Please try again later.", ephemeral=True
+            )
+            return
+
+        # Check if user exists in the database
+        if not check_if_user_exists(
+            client=supabase,
+            username=interaction.user.name,
+            table="hacker",
+        ):
+            logging.warning(
+                f"Team.create: {interaction.user} has not registered for the event"
+            )
+            await interaction.followup.send(
+                "You haven't registered for the event. Please do so with `/register hacker`",
+                ephemeral=True,
+            )
+            return
+
+        # check if user is already in a team
+        team = (
+            supabase.table("team-membership")
+            .select("team-id", count="exact")
+            .eq("username", interaction.user.name)
+            .execute()
+        )
+        if hasattr(team, "count") and team.count > 0:
+            logging.warning(f"Team.create: {interaction.user} is already in a team")
+            await interaction.followup.send(
+                "You are already in a team.",
+                ephemeral=True,
+            )
+            return
+
+        # create team
+        logging.info(f"Team.create: creating team for {interaction.user}")
+        try:
+            view = TeamCreate(supabase=supabase)
+            await interaction.followup.send(
+                "Select your team's root, branch, and leaf",
+                view=view,
+                ephemeral=True,
+            )
+
+        except Exception as e:
+            logging.error(
+                f"Team.create: error while creating team for {interaction.user}: {e}"
+            )
+            await interaction.followup.send(
+                "An error occurred while creating your team. Please try again later.",
+                ephemeral=True,
+            )
+
+    @app_commands.command(description="Edit your team's root, branch, and leaf")
+    async def edit(self, interaction: discord.Interaction):
+        logging.info(f"Team.edit: received team edit request from {interaction.user}")
+        supabase: Client = self.extras["supabase"]
+
+        # defer the response to avoid timeout
+        await interaction.response.defer(ephemeral=True)
+
+        # Check if user exists in the database
+        if not check_if_user_exists(
+            client=supabase,
+            username=interaction.user.name,
+            table="hacker",
+        ):
+            logging.warning(
+                f"Team.edit: {interaction.user} has not registered for the event"
+            )
+            await interaction.followup.send(
+                "You haven't registered for the event. Please do so with `/register hacker`",
+                ephemeral=True,
+            )
+            return
+
+        # check if user has already created a team
+        team = (
+            supabase.table("team")
+            .select("id", count="exact")
+            .eq("leader", interaction.user.name)
+            .execute()
+        )
+        if hasattr(team, "count") and team.count == 0:
+            logging.warning(f"Team.edit: {interaction.user} has not created a team")
+            await interaction.followup.send(
+                "You have not created a team. You can only edit a team that you have created.",
+                ephemeral=True,
+            )
+            return
+
+        # check if user is not a leader or not in a team
+        team = (
+            supabase.table("team-membership")
+            .select("leader")
+            .eq("username", interaction.user.name)
+            .execute()
+        )
+        if (hasattr(team, "data") and not team.data[0]["leader"]) or not hasattr(
+            team, "data"
+        ):
+            logging.warning(f"Team.edit: {interaction.user} is not a leader of a team")
+            await interaction.followup.send(
+                "You are not a leader of a team, or not part of a team. You can only edit a team that you have created.",
+                ephemeral=True,
+            )
+            return
+
+        # edit team
+        logging.info(f"Team.edit: editing team for {interaction.user}")
+        try:
+            view = TeamCreate(supabase=supabase, mode="edit")
+            await interaction.followup.send(
+                "Select your team's root, branch, and leaf",
+                view=view,
+                ephemeral=True,
+            )
+
+        except Exception as e:
+            logging.error(
+                f"Team.edit: error while editing team for {interaction.user}: {e}"
+            )
+            await interaction.followup.send(
+                "An error occurred while editing your team. Please try again later.",
+                ephemeral=True,
+            )
+
+    @app_commands.command(description="Disband your team")
+    async def disband(self, interaction: discord.Interaction):
+        logging.info(
+            f"Team.delete: received team disband request from {interaction.user}"
+        )
+        supabase: Client = self.extras["supabase"]
+
+        # defer the response to avoid timeout
+        await interaction.response.defer(ephemeral=True)
+
+        # Check if user exists in the database
+        if not check_if_user_exists(
+            client=supabase,
+            username=interaction.user.name,
+            table="hacker",
+        ):
+            logging.warning(
+                f"Team.delete: {interaction.user} has not registered for the event"
+            )
+            await interaction.followup.send(
+                "You haven't registered for the event. Please do so with `/register hacker`",
+                ephemeral=True,
+            )
+            return
+
+        # check if user is not a leader or not in a team
+        team = (
+            supabase.table("team-membership")
+            .select("leader")
+            .eq("username", interaction.user.name)
+            .execute()
+        )
+        if (hasattr(team, "data") and not team.data[0]["leader"]) or not hasattr(
+            team, "data"
+        ):
+            logging.warning(
+                f"Team.delete: {interaction.user} is not a leader of a team"
+            )
+            await interaction.followup.send(
+                "You are not a leader of a team, or not part of a team. You can only disband a team that you have created.",
+                ephemeral=True,
+            )
+            return
+
+        # delete team
+        logging.info(f"Team.delete: deleting team for {interaction.user}")
+        try:
+            team_id = (
+                supabase.table("team")
+                .select("id")
+                .eq("leader", interaction.user.name)
+                .execute()
+                .data[0]["id"]
+            )
+            supabase.table("team").delete().eq("id", team_id).execute()
+            # we don't need to delete team-membership because it will be deleted automatically via foreign key cascade
+            # if cascade is not enabled, we can delete team-membership like this:
+            # supabase.table("team-membership").delete().eq("team-id", team_id).execute()
+            logging.info(
+                f"Team.delete: {interaction.user}'s team disbanded successfully"
+            )
+            await interaction.followup.send(
+                "Your team has been disbanded.", ephemeral=True
+            )
+
+        except Exception as e:
+            logging.error(
+                f"Team.delete: error while deleting team for {interaction.user}: {e}"
+            )
+            await interaction.followup.send(
+                "An error occurred while disbanding your team. Please try again later.",
+                ephemeral=True,
+            )
+
+    @app_commands.command(description="Add a member to your team")
+    async def add(self, interaction: discord.Interaction, user: str):
+        logging.info(f"Team.add: received team add request from {interaction.user}")
+        supabase: Client = self.extras["supabase"]
+
+        # defer the response to avoid timeout
+        await interaction.response.defer(ephemeral=True)
+
+        # Check if user exists in the database
+        if not check_if_user_exists(
+            client=supabase,
+            username=interaction.user.name,
+            table="hacker",
+        ):
+            logging.warning(
+                f"Team.add: {interaction.user} has not registered for the event"
+            )
+            await interaction.followup.send(
+                "You haven't registered for the event. Please do so with `/register hacker`",
+                ephemeral=True,
+            )
+            return
+
+        # Check if user being added exists in the database
+        if not check_if_user_exists(
+            client=supabase,
+            username=user,
+            table="hacker",
+        ):
+            logging.warning(f"Team.add: {user} has not registered for the event")
+            await interaction.followup.send(
+                f"{user} hasn't registered for the event. Please ask them to register with `/register hacker`",
+                ephemeral=True,
+            )
+            return
+
+        # check if user is leader of a team
+        team = (
+            supabase.table("team-membership")
+            .select("leader")
+            .eq("username", interaction.user.name)
+            .execute()
+        )
+        if hasattr(team, "data") and not team.data[0]["leader"]:
+            logging.warning(f"Team.add: {interaction.user} is not a leader of a team")
+            await interaction.followup.send(
+                "You are not a leader of a team. You can only add a member to a team that you are leader of.",
+                ephemeral=True,
+            )
+            return
+
+        # check if user being added is already in a team
+        team = (
+            supabase.table("team-membership")
+            .select("team-id", count="exact")
+            .eq("username", user)
+            .execute()
+        )
+        if hasattr(team, "count") and team.count > 0:
+            logging.warning(f"Team.add: {user} is already in a team")
+            await interaction.followup.send(
+                f"{user} is already in a team. You can only add a user who is not in a team.",
+                ephemeral=True,
+            )
+            return
+
+        # check if team is full
+        team = (
+            supabase.table("team-membership")
+            .select("team-id")
+            .eq("username", interaction.user.name)
+            .execute()
+        )
+        team_id = team.data[0]["team-id"]
+        team_size = (
+            supabase.table("team-membership")
+            .select("team-id", count="exact")
+            .eq("team-id", team_id)
+            .execute()
+            .count
+        )
+        if team_size >= 4:
+            logging.warning(f"Team.add: {interaction.user}'s team is full")
+            await interaction.followup.send(
+                "Your team is full. Your maximum team size is 4 members.",
+                ephemeral=True,
+            )
+            return
+
+        # add member to team
+        logging.info(f"Team.add: adding {user} to {interaction.user}'s team")
+        try:
+            team_id = (
+                supabase.table("team-membership")
+                .select("team-id")
+                .eq("username", interaction.user.name)
+                .execute()
+                .data[0]["team-id"]
+            )
+            user_id = (
+                supabase.table("hacker")
+                .select("id")
+                .eq("username", user)
+                .execute()
+                .data[0]["id"]
+            )
+            supabase.table("team-membership").insert(
+                {
+                    "team-id": team_id,
+                    "username": user,
+                    "user-id": user_id,
+                    "leader": False,
+                }
+            ).execute()
+            logging.info(
+                f"Team.add: {user} added to {interaction.user}'s team successfully"
+            )
+            await interaction.followup.send(
+                f"{user} has been added to your team.", ephemeral=True
+            )
+
+        except Exception as e:
+            logging.error(
+                f"Team.add: error while adding {user} to {interaction.user}'s team: {e}"
+            )
+            await interaction.followup.send(
+                f"An error occurred while adding {user} to your team. Please try again later.",
+                ephemeral=True,
+            )
+
+    @app_commands.command(description="Remove a member from your team")
+    async def remove(self, interaction: discord.Interaction, user: str):
+        logging.info(
+            f"Team.remove: received team remove request from {interaction.user}"
+        )
+        supabase: Client = self.extras["supabase"]
+
+        # defer the response to avoid timeout
+        await interaction.response.defer(ephemeral=True)
+
+        # Check if user exists in the database
+        if not check_if_user_exists(
+            client=supabase,
+            username=interaction.user.name,
+            table="hacker",
+        ):
+            logging.warning(
+                f"Team.remove: {interaction.user} has not registered for the event"
+            )
+            await interaction.followup.send(
+                "You haven't registered for the event. Please do so with `/register hacker`",
+                ephemeral=True,
+            )
+            return
+
+        # Check if user being removed exists in the database
+        if not check_if_user_exists(
+            client=supabase,
+            username=user,
+            table="hacker",
+        ):
+            logging.warning(f"Team.remove: cannot find {user} in the database")
+            await interaction.followup.send(
+                f"Cannot find {user} in the database.", ephemeral=True
+            )
+            return
+
+        # check if user is leader of a team
+        team = (
+            supabase.table("team-membership")
+            .select("leader")
+            .eq("username", interaction.user.name)
+            .execute()
+        )
+        if hasattr(team, "data") and not team.data[0]["leader"]:
+            logging.warning(
+                f"Team.remove: {interaction.user} is not a leader of a team"
+            )
+            await interaction.followup.send(
+                "You are not a leader of a team. You can only remove a member from a team that you are leader of.",
+                ephemeral=True,
+            )
+            return
+
+        # check if user being removed is not part of a team
+        team = (
+            supabase.table("team-membership")
+            .select("team-id", count="exact")
+            .eq("username", user)
+            .execute()
+        )
+        if hasattr(team, "count") and team.count == 0:
+            logging.warning(f"Team.remove: {user} is not in a team")
+            await interaction.followup.send(
+                f"{user} is not in a team. You can only remove a member who is in a team.",
+                ephemeral=True,
+            )
+            return
+
+        # check if user being removed is in the team
+        team = (
+            supabase.table("team-membership")
+            .select("team-id")
+            .eq("username", interaction.user.name)
+            .execute()
+        )
+        user_team = (
+            supabase.table("team-membership")
+            .select("team-id")
+            .eq("username", user)
+            .execute()
+        )
+        if (
+            hasattr(team, "data")
+            and hasattr(user_team, "data")
+            and team.data[0]["team-id"] != user_team.data[0]["team-id"]
+        ):
+            logging.warning(f"Team.remove: {user} is not in {interaction.user}'s team")
+            await interaction.followup.send(
+                f"{user} is not in your team. You can only remove a member who is in your team.",
+                ephemeral=True,
+            )
+            return
+
+        # remove member from team
+        logging.info(f"Team.remove: removing {user} from {interaction.user}'s team")
+        try:
+            team_id = (
+                supabase.table("team-membership")
+                .select("team-id")
+                .eq("username", interaction.user.name)
+                .execute()
+                .data[0]["team-id"]
+            )
+            supabase.table("team-membership").delete().eq("team-id", team_id).eq(
+                "username", user
+            ).execute()
+            logging.info(
+                f"Team.remove: {user} removed from {interaction.user}'s team successfully"
+            )
+            await interaction.followup.send(
+                f"{user} has been removed from your team.", ephemeral=True
+            )
+
+        except Exception as e:
+            logging.error(
+                f"Team.remove: error while removing {user} from {interaction.user}'s team: {e}"
+            )
+            await interaction.followup.send(
+                f"An error occurred while removing {user} from your team. Please try again later.",
+                ephemeral=True,
+            )
+
+    @app_commands.command(description="Leave your team")
+    async def leave(self, interaction: discord.Interaction):
+        logging.info(f"Team.leave: received team leave request from {interaction.user}")
+        supabase: Client = self.extras["supabase"]
+
+        # defer the response to avoid timeout
+        await interaction.response.defer(ephemeral=True)
+
+        # Check if user exists in the database
+        if not check_if_user_exists(
+            client=supabase,
+            username=interaction.user.name,
+            table="hacker",
+        ):
+            logging.warning(
+                f"Team.leave: {interaction.user} has not registered for the event"
+            )
+            await interaction.followup.send(
+                "You haven't registered for the event. Please do so with `/register hacker`",
+                ephemeral=True,
+            )
+            return
+
+        # check if user is in a team
+        team = (
+            supabase.table("team-membership")
+            .select("team-id", count="exact")
+            .eq("username", interaction.user.name)
+            .execute()
+        )
+        if hasattr(team, "count") and team.count == 0:
+            logging.warning(f"Team.leave: {interaction.user} is not in a team")
+            await interaction.followup.send(
+                "You are not in a team. You can only leave a team that you are part of.",
+                ephemeral=True,
+            )
+            return
+
+        # check if user is a leader of a team
+        team = (
+            supabase.table("team-membership")
+            .select("leader")
+            .eq("username", interaction.user.name)
+            .execute()
+        )
+        if hasattr(team, "data") and team.data[0]["leader"]:
+            logging.warning(f"Team.leave: {interaction.user} is a leader of a team")
+            await interaction.followup.send(
+                "You are a leader of a team. You can only leave a team that you are not a leader of. Transfer leadership to another member before leaving.",
+                ephemeral=True,
+            )
+            return
+
+        # leave team
+        logging.info(f"Team.leave: leaving team for {interaction.user}")
+        try:
+            team_id = (
+                supabase.table("team-membership")
+                .select("team-id")
+                .eq("username", interaction.user.name)
+                .execute()
+                .data[0]["team-id"]
+            )
+            supabase.table("team-membership").delete().eq("team-id", team_id).eq(
+                "username", interaction.user.name
+            ).execute()
+            logging.info(f"Team.leave: {interaction.user} left the team successfully")
+            await interaction.followup.send("You have left the team.", ephemeral=True)
+
+        except Exception as e:
+            logging.error(
+                f"Team.leave: error while leaving team for {interaction.user}: {e}"
+            )
+            await interaction.followup.send(
+                "An error occurred while leaving the team. Please try again later.",
+                ephemeral=True,
+            )
+
+    @app_commands.command(description="Transfer leadership of your team")
+    async def transfer_leader(self, interaction: discord.Interaction, user: str):
+        logging.info(
+            f"Team.transfer_leader: received team transfer leadership request from {interaction.user}"
+        )
+        supabase: Client = self.extras["supabase"]
+
+        await interaction.response.defer(ephemeral=True)
+
+        # Check if user exists in the database
+        if not check_if_user_exists(
+            client=supabase,
+            username=interaction.user.name,
+            table="hacker",
+        ):
+            logging.warning(
+                f"Team.transfer_leader: {interaction.user} has not registered for the event"
+            )
+            await interaction.followup.send(
+                "You haven't registered for the event. Please do so with `/register hacker`",
+                ephemeral=True,
+            )
+            return
+
+        # Check if user being transferred leadership exists in the database
+        if not check_if_user_exists(
+            client=supabase,
+            username=user,
+            table="hacker",
+        ):
+            logging.warning(f"Team.transfer_leader: cannot find {user} in the database")
+            await interaction.followup.send(
+                f"Cannot find {user} in the database.", ephemeral=True
+            )
+            return
+
+        # check if user is leader of a team
+        team = (
+            supabase.table("team")
+            .select("id", count="exact")
+            .eq("leader", interaction.user.name)
+            .execute()
+        )
+        if hasattr(team, "count") and team.count == 0:
+            logging.warning(
+                f"Team.transfer_leader: {interaction.user} has not created a team"
+            )
+            await interaction.followup.send(
+                "You have not created a team. You can only transfer leadership of a team that you have created.",
+                ephemeral=True,
+            )
+            return
+
+        # check if user being transferred leadership is not part of a team
+        team = (
+            supabase.table("team-membership")
+            .select("team-id", count="exact")
+            .eq("username", user)
+            .execute()
+        )
+        if hasattr(team, "count") and team.count == 0:
+            logging.warning(f"Team.transfer_leader: {user} is not in a team")
+            await interaction.followup.send(
+                f"{user} is not in a team. You can only transfer leadership to a member who is in a team.",
+                ephemeral=True,
+            )
+            return
+
+        # check if user being transferred leadership is in the team
+        team = (
+            supabase.table("team-membership")
+            .select("team-id")
+            .eq("username", interaction.user.name)
+            .execute()
+        )
+        user_team = (
+            supabase.table("team-membership")
+            .select("team-id")
+            .eq("username", user)
+            .execute()
+        )
+        if (
+            hasattr(team, "data")
+            and hasattr(user_team, "data")
+            and team.data[0]["team-id"] != user_team.data[0]["team-id"]
+        ):
+            logging.warning(
+                f"Team.transfer_leader: {user} is not in {interaction.user}'s team"
+            )
+            await interaction.followup.send(
+                f"{user} is not in your team. You can only transfer leadership to a member who is in your team.",
+                ephemeral=True,
+            )
+            return
+
+        # transfer leadership
+        logging.info(
+            f"Team.transfer_leader: transferring leadership from {interaction.user} to {user}"
+        )
+        try:
+            team_id = (
+                supabase.table("team")
+                .select("id")
+                .eq("leader", interaction.user.name)
+                .execute()
+                .data[0]["id"]
+            )
+            supabase.table("team-membership").update(
+                {
+                    "leader": True,
+                }
+            ).eq(
+                "team-id", team_id
+            ).eq("username", user).execute()
+            supabase.table("team-membership").update(
+                {
+                    "leader": False,
+                }
+            ).eq(
+                "team-id", team_id
+            ).eq("username", interaction.user.name).execute()
+            supabase.table("team").update(
+                {
+                    "leader": user,
+                }
+            ).eq("id", team_id).execute()
+            logging.info(
+                f"Team.transfer_leader: leadership transferred from {interaction.user} to {user} successfully"
+            )
+            await interaction.followup.send(
+                f"Leadership has been transferred to {user}.", ephemeral=True
+            )
+
+        except Exception as e:
+            logging.error(
+                f"Team.transfer_leader: error while transferring leadership from {interaction.user} to {user}: {e}"
+            )
+            await interaction.followup.send(
+                f"An error occurred while transferring leadership to {user}. Please try again later.",
+                ephemeral=True,
+            )
+
+    @app_commands.command(description="View your team")
+    async def view(self, interaction: discord.Interaction):
+        logging.info(f"Team.view: received team view request from {interaction.user}")
+        supabase: Client = self.extras["supabase"]
+
+        # defer the response to avoid timeout
+        await interaction.response.defer(ephemeral=True)
+
+        # Check if user exists in the database
+        if not check_if_user_exists(
+            client=supabase,
+            username=interaction.user.name,
+            table="hacker",
+        ):
+            logging.warning(
+                f"Team.view: {interaction.user} has not registered for the event"
+            )
+            await interaction.followup.send(
+                "You haven't registered for the event. Please do so with `/register hacker`",
+                ephemeral=True,
+            )
+            return
+
+        # check if user is in a team
+        team = (
+            supabase.table("team-membership")
+            .select("team-id", count="exact")
+            .eq("username", interaction.user.name)
+            .execute()
+        )
+        if hasattr(team, "count") and team.count == 0:
+            logging.warning(f"Team.view: {interaction.user} is not in a team")
+            await interaction.followup.send(
+                "You are not in a team. You can only view a team that you are part of.",
+                ephemeral=True,
+            )
+            return
+
+        # view team
+        logging.info(f"Team.view: viewing team for {interaction.user}")
+        try:
+            team_id = (
+                supabase.table("team-membership")
+                .select("team-id")
+                .eq("username", interaction.user.name)
+                .execute()
+                .data[0]["team-id"]
+            )
+            team = (
+                supabase.table("team").select("*").eq("id", team_id).execute().data[0]
+            )
+            team_members = (
+                supabase.table("team-membership")
+                .select("username")
+                .eq("team-id", team_id)
+                .execute()
+                .data
+            )
+            members = [member["username"] for member in team_members]
+
+            team_embed = discord.Embed(
+                title=f"Leader: {team['leader']}",
+                description=f"Root: {team['root']}\nBranch: {team['branch']}\nLeaf: {team['leaf']}",
+                color=discord.Color.blue(),
+            )
+            team_embed.add_field(name="Members", value="\n".join(members))
+            await interaction.followup.send(embed=team_embed, ephemeral=True)
+
+        except Exception as e:
+            logging.error(
+                f"Team.view: error while viewing team for {interaction.user}: {e}"
+            )
+            await interaction.followup.send(
+                "An error occurred while viewing the team. Please try again later.",
+                ephemeral=True,
+            )
+
+
+async def setup(client: discord.Client):
+    logging.info("Team: registering slash command")
+    load_dotenv()
+    client.tree.add_command(
+        Team(
+            name="team",
+            description="Start and manage your team for mentor matching",
+            extras={
+                "supabase": supabase_client,
+            },
+        )
+    )
