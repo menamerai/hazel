@@ -29,11 +29,8 @@ logging.basicConfig(
 @client.event
 async def on_ready():
     logging.info(f"on_ready: {client.user} is connecting to Discord...")
-    await client.load_extension("hazel.slashcmds.register")
-    # TODO: remove this line when bot is ready for production
-    # await client.load_extension("hazel.slashcmds.unregister")
-    # await client.load_extension("hazel.slashcmds.display")
-    await client.load_extension("hazel.slashcmds.update")
+    await client.load_extension("hazel.slashcmds.hacker")
+    await client.load_extension("hazel.slashcmds.mentor")
     await client.load_extension("hazel.slashcmds.team")
     # sync current commands with the fodh server for quick development
     client.tree.copy_global_to(guild=discord.Object(id=os.getenv("FODH_GUILD_ID")))
