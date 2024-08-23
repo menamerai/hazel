@@ -922,17 +922,17 @@ class Team(app_commands.Group):
             return
 
         # check if user is in a team
-        team = (
-            supabase.table("team-membership")
-            .select("team_id", count="exact")
-            .limit(1)
+        has_team = (
+            supabase.table("hacker")
+            .select("has_team")
             .eq("username", interaction.user.name)
             .execute()
+            .data[0]["has_team"]
         )
-        if hasattr(team, "count") and team.count == 0:
+        if not has_team:
             logging.warning(f"Team.view: {interaction.user} is not in a team")
             await interaction.followup.send(
-                "You are not in a team. You can only view a team that you are part of.",
+                "You are not in a team. You can only view a team if you are in a team.",
                 ephemeral=True,
             )
             return
