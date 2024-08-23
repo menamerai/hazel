@@ -19,7 +19,6 @@ class Register(app_commands.Group):
             f"Register.hacker: received register request from {interaction.user}"
         )
         supabase: Client = self.extras["supabase"]
-        discord_client: discord.Client = self.extras["client"]
 
         # check if it is currently 8AM August 24th 2024
         if datetime.now() < datetime(2024, 8, 24, 8, 0, 0):
@@ -50,7 +49,7 @@ class Register(app_commands.Group):
                 f"Register.hacker: {interaction.user} does not have the required roles. Roles: {user_roles}"
             )
             reaction_roles_channel = discord.utils.get(
-                discord_client.get_all_channels(), name="🎭reaction-roles"
+                interaction.guild.channels, name="🎭reaction-roles"
             )
             await interaction.response.send_message(
                 f"You do not have the required roles to register for the event. Please make sure you have exactly one root role, one leaf role, and one branch role. Modify your roles by reacting at {reaction_roles_channel.mention} and try again, or contact an organizer.",
@@ -98,7 +97,6 @@ class Register(app_commands.Group):
             f"Register.mentor: received register request from {interaction.user}"
         )
         supabase: Client = self.extras["supabase"]
-        discord_client: discord.Client = self.extras["client"]
 
         # Check if password is correct
         if password != os.getenv("MENTOR_PASSWORD"):
@@ -130,7 +128,7 @@ class Register(app_commands.Group):
                 f"Register.mentor: {interaction.user} does not have the required roles. Roles: {user_roles}"
             )
             reaction_roles_channel = discord.utils.get(
-                discord_client.get_all_channels(), name="🎭reaction-roles"
+                interaction.guild.channels, name="🎭reaction-roles"
             )
             await interaction.response.send_message(
                 f"You do not have the required roles to register for the event. Please make sure you have exactly one root role and one branch role. Modify your roles by reacting at {reaction_roles_channel.mention} and try again, or contact an organizer.",
@@ -177,7 +175,6 @@ async def setup(client: discord.Client):
             description="Register a user for the event",
             extras={
                 "supabase": supabase_client,
-                "client": client,
             },
         )
     )
