@@ -942,7 +942,8 @@ class Team(app_commands.Group):
         try:
             team = (
                 supabase.table("team")
-                .select("leader", "root", "branch", "leaf")
+                .select("leader, root, branch, leaf, members")
+                .limit(1)
                 .eq("leader", interaction.user.name)
                 .execute()
             ).data[0]
