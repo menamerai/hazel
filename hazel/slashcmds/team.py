@@ -678,10 +678,12 @@ class Team(app_commands.Group):
         # remove member from team
         logging.info(f"Team.remove: removing {user} from {interaction.user}'s team")
         try:
-            logging.info(f"Team.remove: current members: {members.data[0]['members']}")
+            members = members.data[0]
+            logging.info(f"Team.remove: current members: {members}")
+            members.remove(user)
             supabase.table("team").update(
                 {
-                    "members": members.data[0]["members"].remove(user),
+                    "members": members,
                 }
             ).eq("leader", interaction.user.name).execute()
             supabase.table("hacker").update(
@@ -769,11 +771,12 @@ class Team(app_commands.Group):
                 .limit(1)
                 .eq("leader", interaction.user.name)
                 .execute()
-            )
-            logging.info(f"Team.leave: current members: {members.data[0]['members']}")
+            ).data[0]["members"]
+            logging.info(f"Team.leave: current members: {members}")
+            members.remove(interaction.user.name)
             supabase.table("team").update(
                 {
-                    "members": members.data[0]["members"].remove(interaction.user.name),
+                    "members": members,
                 }
             ).eq("leader", interaction.user.name).execute()
             supabase.table("hacker").update(
