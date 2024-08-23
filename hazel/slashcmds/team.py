@@ -27,30 +27,14 @@ async def create_team(
             "root": root,
             "branch": branch,
             "leaf": leaf,
+            "members": [interaction.user.name],
         }
     ).execute()
-    team_id = (
-        supabase.table("team")
-        .select("id")
-        .eq("leader", interaction.user.name)
-        .execute()
-        .data[0]["id"]
-    )
-    user_id = (
-        supabase.table("hacker")
-        .select("id")
-        .eq("username", interaction.user.name)
-        .execute()
-        .data[0]["id"]
-    )
-    supabase.table("team-membership").insert(
+    supabase.table("hacker").update(
         {
-            "team-id": team_id,
-            "username": interaction.user.name,
-            "user-id": user_id,
-            "leader": True,
+            "has_team": True,
         }
-    ).execute()
+    ).eq("username", interaction.user.name).execute()
     logging.info(f"create_team: {interaction.user}'s team created successfully")
     await interaction.response.send_message(
         "Your team has been created.", ephemeral=True
@@ -328,16 +312,17 @@ class Team(app_commands.Group):
             return
 
         # check if user is already in a team
-        team = (
-            supabase.table("team-membership")
-            .select("team-id", count="exact")
+        in_team = (
+            supabase.table("hacker")
+            .select("has_team")
             .eq("username", interaction.user.name)
             .execute()
+            .data[0]["has_team"]
         )
-        if hasattr(team, "count") and team.count > 0:
+        if in_team:
             logging.warning(f"Team.create: {interaction.user} is already in a team")
             await interaction.followup.send(
-                "You are already in a team.",
+                "You are already in a team. You can only create a team if you are not in a team.",
                 ephemeral=True,
             )
             return
@@ -384,7 +369,7 @@ class Team(app_commands.Group):
             )
             return
 
-        # check if user has already created a team
+        # check if user is leader of a team
         team = (
             supabase.table("team")
             .select("id", count="exact")
@@ -394,24 +379,7 @@ class Team(app_commands.Group):
         if hasattr(team, "count") and team.count == 0:
             logging.warning(f"Team.edit: {interaction.user} has not created a team")
             await interaction.followup.send(
-                "You have not created a team. You can only edit a team that you have created.",
-                ephemeral=True,
-            )
-            return
-
-        # check if user is not a leader or not in a team
-        team = (
-            supabase.table("team-membership")
-            .select("leader")
-            .eq("username", interaction.user.name)
-            .execute()
-        )
-        if (hasattr(team, "data") and not team.data[0]["leader"]) or not hasattr(
-            team, "data"
-        ):
-            logging.warning(f"Team.edit: {interaction.user} is not a leader of a team")
-            await interaction.followup.send(
-                "You are not a leader of a team, or not part of a team. You can only edit a team that you have created.",
+                "You are not the leader of a team. You can only edit a team that you are leader of.",
                 ephemeral=True,
             )
             return
@@ -438,7 +406,7 @@ class Team(app_commands.Group):
     @app_commands.command(description="Disband your team")
     async def disband(self, interaction: discord.Interaction):
         logging.info(
-            f"Team.delete: received team disband request from {interaction.user}"
+            f"Team.disband: received team disband request from {interaction.user}"
         )
         supabase: Client = self.extras["supabase"]
 
@@ -452,7 +420,7 @@ class Team(app_commands.Group):
             table="hacker",
         ):
             logging.warning(
-                f"Team.delete: {interaction.user} has not registered for the event"
+                f"Team.disband: {interaction.user} has not registered for the event"
             )
             await interaction.followup.send(
                 "You haven't registered for the event. Please do so with `/register hacker`",
@@ -460,41 +428,44 @@ class Team(app_commands.Group):
             )
             return
 
-        # check if user is not a leader or not in a team
+        # check if user is leader of a team
         team = (
-            supabase.table("team-membership")
-            .select("leader")
-            .eq("username", interaction.user.name)
+            supabase.table("team")
+            .select("id", count="exact")
+            .eq("leader", interaction.user.name)
             .execute()
         )
-        if (hasattr(team, "data") and not team.data[0]["leader"]) or not hasattr(
-            team, "data"
-        ):
+        if hasattr(team, "count") and team.count == 0:
             logging.warning(
-                f"Team.delete: {interaction.user} is not a leader of a team"
+                f"Team.disband: {interaction.user} is not a leader of a team"
             )
             await interaction.followup.send(
-                "You are not a leader of a team, or not part of a team. You can only disband a team that you have created.",
+                "You are not a leader of a team. You can only disband a team that you are leader of.",
                 ephemeral=True,
             )
             return
 
         # delete team
-        logging.info(f"Team.delete: deleting team for {interaction.user}")
+        logging.info(f"Team.disband: deleting team for {interaction.user}")
         try:
-            team_id = (
+            members = (
                 supabase.table("team")
-                .select("id")
+                .select("members")
                 .eq("leader", interaction.user.name)
                 .execute()
-                .data[0]["id"]
+                .data[0]["members"]
             )
-            supabase.table("team").delete().eq("id", team_id).execute()
-            # we don't need to delete team-membership because it will be deleted automatically via foreign key cascade
-            # if cascade is not enabled, we can delete team-membership like this:
-            # supabase.table("team-membership").delete().eq("team-id", team_id).execute()
+            supabase.table("team").delete().eq("leader", interaction.user.name).limit(
+                1
+            ).execute()
+            for member in members:
+                supabase.table("hacker").update(
+                    {
+                        "has_team": False,
+                    }
+                ).eq("username", member).execute()
             logging.info(
-                f"Team.delete: {interaction.user}'s team disbanded successfully"
+                f"Team.disband: {interaction.user}'s team disbanded successfully"
             )
             await interaction.followup.send(
                 "Your team has been disbanded.", ephemeral=True
@@ -502,7 +473,7 @@ class Team(app_commands.Group):
 
         except Exception as e:
             logging.error(
-                f"Team.delete: error while deleting team for {interaction.user}: {e}"
+                f"Team.disband: error while deleting team for {interaction.user}: {e}"
             )
             await interaction.followup.send(
                 "An error occurred while disbanding your team. Please try again later.",
@@ -547,12 +518,12 @@ class Team(app_commands.Group):
 
         # check if user is leader of a team
         team = (
-            supabase.table("team-membership")
-            .select("leader")
-            .eq("username", interaction.user.name)
+            supabase.table("team")
+            .select("id", count="exact")
+            .eq("leader", interaction.user.name)
             .execute()
         )
-        if hasattr(team, "data") and not team.data[0]["leader"]:
+        if hasattr(team, "count") and team.count == 0:
             logging.warning(f"Team.add: {interaction.user} is not a leader of a team")
             await interaction.followup.send(
                 "You are not a leader of a team. You can only add a member to a team that you are leader of.",
@@ -561,13 +532,14 @@ class Team(app_commands.Group):
             return
 
         # check if user being added is already in a team
-        team = (
-            supabase.table("team-membership")
-            .select("team-id", count="exact")
+        in_team = (
+            supabase.table("hacker")
+            .select("has_team")
             .eq("username", user)
             .execute()
+            .data[0]["has_team"]
         )
-        if hasattr(team, "count") and team.count > 0:
+        if in_team:
             logging.warning(f"Team.add: {user} is already in a team")
             await interaction.followup.send(
                 f"{user} is already in a team. You can only add a user who is not in a team.",
@@ -576,24 +548,17 @@ class Team(app_commands.Group):
             return
 
         # check if team is full
-        team = (
-            supabase.table("team-membership")
-            .select("team-id")
-            .eq("username", interaction.user.name)
+        members = (
+            supabase.table("team")
+            .select("members")
+            .limit(1)
+            .eq("leader", interaction.user.name)
             .execute()
         )
-        team_id = team.data[0]["team-id"]
-        team_size = (
-            supabase.table("team-membership")
-            .select("team-id", count="exact")
-            .eq("team-id", team_id)
-            .execute()
-            .count
-        )
-        if team_size >= 4:
+        if len(members.data[0]["members"]) >= 4:
             logging.warning(f"Team.add: {interaction.user}'s team is full")
             await interaction.followup.send(
-                "Your team is full. Your maximum team size is 4 members.",
+                "Your team is full. You can only add a member if your team has less than 4 members.",
                 ephemeral=True,
             )
             return
@@ -601,28 +566,16 @@ class Team(app_commands.Group):
         # add member to team
         logging.info(f"Team.add: adding {user} to {interaction.user}'s team")
         try:
-            team_id = (
-                supabase.table("team-membership")
-                .select("team-id")
-                .eq("username", interaction.user.name)
-                .execute()
-                .data[0]["team-id"]
-            )
-            user_id = (
-                supabase.table("hacker")
-                .select("id")
-                .eq("username", user)
-                .execute()
-                .data[0]["id"]
-            )
-            supabase.table("team-membership").insert(
+            supabase.table("team").update(
                 {
-                    "team-id": team_id,
-                    "username": user,
-                    "user-id": user_id,
-                    "leader": False,
+                    "members": [user] + members.data[0]["members"],
                 }
-            ).execute()
+            ).eq("leader", interaction.user.name).execute()
+            supabase.table("hacker").update(
+                {
+                    "has_team": True,
+                }
+            ).eq("username", user).execute()
             logging.info(
                 f"Team.add: {user} added to {interaction.user}'s team successfully"
             )
@@ -648,6 +601,17 @@ class Team(app_commands.Group):
 
         # defer the response to avoid timeout
         await interaction.response.defer(ephemeral=True)
+
+        # check if the person being removed is the leader
+        if interaction.user.name == user:
+            logging.warning(
+                f"Team.remove: {interaction.user} tried to remove themselves"
+            )
+            await interaction.followup.send(
+                "You cannot remove yourself from the team. Use `/team leave` to leave the team.",
+                ephemeral=True,
+            )
+            return
 
         # Check if user exists in the database
         if not check_if_user_exists(
@@ -677,13 +641,14 @@ class Team(app_commands.Group):
             return
 
         # check if user is leader of a team
-        team = (
-            supabase.table("team-membership")
+        in_team = (
+            supabase.table("team")
             .select("leader")
-            .eq("username", interaction.user.name)
+            .eq("leader", interaction.user.name)
             .execute()
+            .data[0]["leader"]
         )
-        if hasattr(team, "data") and not team.data[0]["leader"]:
+        if not in_team:
             logging.warning(
                 f"Team.remove: {interaction.user} is not a leader of a team"
             )
@@ -693,39 +658,15 @@ class Team(app_commands.Group):
             )
             return
 
-        # check if user being removed is not part of a team
-        team = (
-            supabase.table("team-membership")
-            .select("team-id", count="exact")
-            .eq("username", user)
+        # check if user being removed is part of your team
+        members = (
+            supabase.table("team")
+            .select("members")
+            .limit(1)
+            .eq("leader", interaction.user.name)
             .execute()
         )
-        if hasattr(team, "count") and team.count == 0:
-            logging.warning(f"Team.remove: {user} is not in a team")
-            await interaction.followup.send(
-                f"{user} is not in a team. You can only remove a member who is in a team.",
-                ephemeral=True,
-            )
-            return
-
-        # check if user being removed is in the team
-        team = (
-            supabase.table("team-membership")
-            .select("team-id")
-            .eq("username", interaction.user.name)
-            .execute()
-        )
-        user_team = (
-            supabase.table("team-membership")
-            .select("team-id")
-            .eq("username", user)
-            .execute()
-        )
-        if (
-            hasattr(team, "data")
-            and hasattr(user_team, "data")
-            and team.data[0]["team-id"] != user_team.data[0]["team-id"]
-        ):
+        if user not in members.data[0]["members"]:
             logging.warning(f"Team.remove: {user} is not in {interaction.user}'s team")
             await interaction.followup.send(
                 f"{user} is not in your team. You can only remove a member who is in your team.",
@@ -736,16 +677,16 @@ class Team(app_commands.Group):
         # remove member from team
         logging.info(f"Team.remove: removing {user} from {interaction.user}'s team")
         try:
-            team_id = (
-                supabase.table("team-membership")
-                .select("team-id")
-                .eq("username", interaction.user.name)
-                .execute()
-                .data[0]["team-id"]
-            )
-            supabase.table("team-membership").delete().eq("team-id", team_id).eq(
-                "username", user
-            ).execute()
+            supabase.table("team").update(
+                {
+                    "members": members.data[0]["members"].remove(user),
+                }
+            ).eq("leader", interaction.user.name).execute()
+            supabase.table("hacker").update(
+                {
+                    "has_team": False,
+                }
+            ).eq("username", user).execute()
             logging.info(
                 f"Team.remove: {user} removed from {interaction.user}'s team successfully"
             )
@@ -786,31 +727,33 @@ class Team(app_commands.Group):
             return
 
         # check if user is in a team
-        team = (
-            supabase.table("team-membership")
-            .select("team-id", count="exact")
+        in_team = (
+            supabase.table("hacker")
+            .select("has_team")
             .eq("username", interaction.user.name)
             .execute()
+            .data[0]["has_team"]
         )
-        if hasattr(team, "count") and team.count == 0:
+        if not in_team:
             logging.warning(f"Team.leave: {interaction.user} is not in a team")
             await interaction.followup.send(
-                "You are not in a team. You can only leave a team that you are part of.",
+                "You are not in a team. You can only leave a team if you are in a team.",
                 ephemeral=True,
             )
             return
 
         # check if user is a leader of a team
-        team = (
-            supabase.table("team-membership")
-            .select("leader")
-            .eq("username", interaction.user.name)
+        leader = (
+            supabase.table("team")
+            .select("leader", count="exact")
+            .limit(1)
+            .eq("leader", interaction.user.name)
             .execute()
         )
-        if hasattr(team, "data") and team.data[0]["leader"]:
+        if hasattr(leader, "count") and leader.count == 1:
             logging.warning(f"Team.leave: {interaction.user} is a leader of a team")
             await interaction.followup.send(
-                "You are a leader of a team. You can only leave a team that you are not a leader of. Transfer leadership to another member before leaving.",
+                "You are a leader of a team. You can only leave a team if you are not a leader of a team. Use `/team disband` to disband your team, or `/team transfer_leader` to transfer leadership to another member.",
                 ephemeral=True,
             )
             return
@@ -818,16 +761,23 @@ class Team(app_commands.Group):
         # leave team
         logging.info(f"Team.leave: leaving team for {interaction.user}")
         try:
-            team_id = (
-                supabase.table("team-membership")
-                .select("team-id")
-                .eq("username", interaction.user.name)
+            members = (
+                supabase.table("team")
+                .select("members")
+                .limit(1)
+                .eq("leader", interaction.user.name)
                 .execute()
-                .data[0]["team-id"]
             )
-            supabase.table("team-membership").delete().eq("team-id", team_id).eq(
-                "username", interaction.user.name
-            ).execute()
+            supabase.table("team").update(
+                {
+                    "members": members.data[0]["members"].remove(interaction.user.name),
+                }
+            ).eq("leader", interaction.user.name).execute()
+            supabase.table("hacker").update(
+                {
+                    "has_team": False,
+                }
+            ).eq("username", interaction.user.name).execute()
             logging.info(f"Team.leave: {interaction.user} left the team successfully")
             await interaction.followup.send("You have left the team.", ephemeral=True)
 
@@ -848,6 +798,17 @@ class Team(app_commands.Group):
         supabase: Client = self.extras["supabase"]
 
         await interaction.response.defer(ephemeral=True)
+
+        # check if the person being transferred leadership is the leader
+        if interaction.user.name == user:
+            logging.warning(
+                f"Team.transfer_leader: {interaction.user} tried to transfer leadership to themselves"
+            )
+            await interaction.followup.send(
+                "You cannot transfer leadership to yourself.",
+                ephemeral=True,
+            )
+            return
 
         # Check if user exists in the database
         if not check_if_user_exists(
@@ -877,55 +838,31 @@ class Team(app_commands.Group):
             return
 
         # check if user is leader of a team
-        team = (
+        leader = (
             supabase.table("team")
-            .select("id", count="exact")
+            .select("leader", count="exact")
             .eq("leader", interaction.user.name)
             .execute()
         )
-        if hasattr(team, "count") and team.count == 0:
+        if hasattr(leader, "count") and leader.count == 0:
             logging.warning(
-                f"Team.transfer_leader: {interaction.user} has not created a team"
+                f"Team.transfer_leader: {interaction.user} is not a leader of a team"
             )
             await interaction.followup.send(
-                "You have not created a team. You can only transfer leadership of a team that you have created.",
+                "You are not a leader of a team. You can only transfer leadership if you are a leader of a team.",
                 ephemeral=True,
             )
             return
 
-        # check if user being transferred leadership is not part of a team
-        team = (
-            supabase.table("team-membership")
-            .select("team-id", count="exact")
-            .eq("username", user)
+        # check if user being transferred leadership is not part of the team
+        members = (
+            supabase.table("team")
+            .select("members")
+            .limit(1)
+            .eq("leader", interaction.user.name)
             .execute()
         )
-        if hasattr(team, "count") and team.count == 0:
-            logging.warning(f"Team.transfer_leader: {user} is not in a team")
-            await interaction.followup.send(
-                f"{user} is not in a team. You can only transfer leadership to a member who is in a team.",
-                ephemeral=True,
-            )
-            return
-
-        # check if user being transferred leadership is in the team
-        team = (
-            supabase.table("team-membership")
-            .select("team-id")
-            .eq("username", interaction.user.name)
-            .execute()
-        )
-        user_team = (
-            supabase.table("team-membership")
-            .select("team-id")
-            .eq("username", user)
-            .execute()
-        )
-        if (
-            hasattr(team, "data")
-            and hasattr(user_team, "data")
-            and team.data[0]["team-id"] != user_team.data[0]["team-id"]
-        ):
+        if user not in members.data[0]["members"]:
             logging.warning(
                 f"Team.transfer_leader: {user} is not in {interaction.user}'s team"
             )
@@ -940,32 +877,11 @@ class Team(app_commands.Group):
             f"Team.transfer_leader: transferring leadership from {interaction.user} to {user}"
         )
         try:
-            team_id = (
-                supabase.table("team")
-                .select("id")
-                .eq("leader", interaction.user.name)
-                .execute()
-                .data[0]["id"]
-            )
-            supabase.table("team-membership").update(
-                {
-                    "leader": True,
-                }
-            ).eq(
-                "team-id", team_id
-            ).eq("username", user).execute()
-            supabase.table("team-membership").update(
-                {
-                    "leader": False,
-                }
-            ).eq(
-                "team-id", team_id
-            ).eq("username", interaction.user.name).execute()
             supabase.table("team").update(
                 {
                     "leader": user,
                 }
-            ).eq("id", team_id).execute()
+            ).eq("leader", interaction.user.name).execute()
             logging.info(
                 f"Team.transfer_leader: leadership transferred from {interaction.user} to {user} successfully"
             )
@@ -1008,7 +924,8 @@ class Team(app_commands.Group):
         # check if user is in a team
         team = (
             supabase.table("team-membership")
-            .select("team-id", count="exact")
+            .select("team_id", count="exact")
+            .limit(1)
             .eq("username", interaction.user.name)
             .execute()
         )
@@ -1023,31 +940,19 @@ class Team(app_commands.Group):
         # view team
         logging.info(f"Team.view: viewing team for {interaction.user}")
         try:
-            team_id = (
-                supabase.table("team-membership")
-                .select("team-id")
-                .eq("username", interaction.user.name)
-                .execute()
-                .data[0]["team-id"]
-            )
             team = (
-                supabase.table("team").select("*").eq("id", team_id).execute().data[0]
-            )
-            team_members = (
-                supabase.table("team-membership")
-                .select("username")
-                .eq("team-id", team_id)
+                supabase.table("team")
+                .select("leader", "root", "branch", "leaf")
+                .eq("leader", interaction.user.name)
                 .execute()
-                .data
-            )
-            members = [member["username"] for member in team_members]
+            ).data[0]
 
             team_embed = discord.Embed(
                 title=f"Leader: {team['leader']}",
                 description=f"Root: {team['root']}\nBranch: {team['branch']}\nLeaf: {team['leaf']}",
                 color=discord.Color.blue(),
             )
-            team_embed.add_field(name="Members", value="\n".join(members))
+            team_embed.add_field(name="Members", value="\n".join(team["members"]))
             await interaction.followup.send(embed=team_embed, ephemeral=True)
 
         except Exception as e:
