@@ -23,6 +23,9 @@ class Matchmake(app_commands.Group):
         hackers = supabase.table("hacker").select("*").is_("has_team", False).execute()
         if hasattr(hackers, "data"):
             hackers = hackers.data
+            logging.info(
+                f"Matchmake.start: Found {len(hackers)} hackers in the database"
+            )
         else:
             await interaction.followup.send(
                 "No hackers found in the database", ephemeral=True
@@ -44,6 +47,9 @@ class Matchmake(app_commands.Group):
         random.shuffle(hackers)
         # Matchmake the hackers
         groups = matchmake(hackers)
+        logging.info(
+            f"Matchmake.start: Matchmaking complete. Found {len(groups)} groups"
+        )
         # Save the groups to the database
         for group in groups:
             root = group[0].root.value
@@ -63,6 +69,7 @@ class Matchmake(app_commands.Group):
             await supabase.table("hackers").update({"has_team": True}).in_(
                 "username", members
             ).execute()
+            logging.info(f"Matchmake.start: Saved group {members} to the database")
 
         await interaction.followup.send("Matchmaking complete!", ephemeral=True)
 
