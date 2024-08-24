@@ -67,9 +67,9 @@ class Matchmake(app_commands.Group):
                     "leader": members[0],
                 }
             ).execute()
-            await supabase.table("hacker").update({"has_team": True}).in_(
-                "username", members
-            ).execute()
+            await supabase.table("hacker").update(
+                {"has_team": True, "matchmade": True}
+            ).in_("username", members).execute()
             logging.info(f"Matchmake.start: Saved group {members} to the database")
 
         await interaction.followup.send("Matchmaking complete!", ephemeral=True)
