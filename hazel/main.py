@@ -31,6 +31,7 @@ async def on_ready():
     logging.info(f"on_ready: {client.user} is connecting to Discord...")
     await client.load_extension("hazel.slashcmds.hacker")
     await client.load_extension("hazel.slashcmds.mentor")
+    await client.load_extension("hazel.slashcmds.judge")
     await client.load_extension("hazel.slashcmds.team")
     await client.load_extension("hazel.slashcmds.matchmake")
     # sync current commands with the fodh server for quick development
