@@ -952,7 +952,7 @@ class Team(app_commands.Group):
                 supabase.table("team")
                 .select("leader, root, branch, leaf, members")
                 .limit(1)
-                .contain("members", [interaction.user.name])
+                .contains("members", [interaction.user.name])
                 .execute()
             ).data[0]
 
