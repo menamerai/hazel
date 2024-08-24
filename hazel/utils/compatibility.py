@@ -1,3 +1,4 @@
+import logging
 import math
 from itertools import combinations
 
@@ -103,6 +104,8 @@ def matchmake(
     hackers_by_root = {
         root: [hacker for hacker in hackers if hacker.root == root] for root in Root
     }
+    logging.info(f"compatibility.matchmake: Found {len(hackers)} hackers")
+    logging.info(f"Hackers by root: {hackers_by_root}")
 
     groups = []
 
@@ -140,5 +143,8 @@ def matchmake(
                         groups.append([hacker])
             else:
                 groups.append(current_group)
+
+    logging.info(f"compatibility.matchmake: Matchmaking complete")
+    logging.info(f"compatibility.matchmake: Returned {groups}")
 
     return groups
