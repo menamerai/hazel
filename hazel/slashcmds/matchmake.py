@@ -7,7 +7,7 @@ from supabase import Client
 
 from hazel.services.supabase_client import supabase_client
 from hazel.utils.compatibility import matchmake
-from hazel.utils.models import Hacker
+from hazel.utils.models import *
 
 
 class Matchmake(app_commands.Group):
@@ -36,12 +36,13 @@ class Matchmake(app_commands.Group):
         hackers = [
             Hacker(
                 username=hacker["username"],
-                root=hacker["root"],
-                leaf=hacker["leaf"],
-                branch=hacker["branch"],
+                root=Root(hacker["root"]),
+                leaf=Leaf(hacker["leaf"]),
+                branch=Branch(hacker["branch"]),
             )
             for hacker in hackers
         ]
+        logging.info(f"Matchmake.start: Converted hackers to {hackers} objects")
         # Shuffle the hackers to make the matchmaking process random
         random.seed(seed)
         random.shuffle(hackers)
