@@ -20,7 +20,7 @@ class Matchmake(app_commands.Group):
         supabase: Client = self.extras["supabase"]
 
         # Get all hackers that are not in a team in the database
-        hackers = supabase.table("hackers").select("*").is_("has_team", False).execute()
+        hackers = supabase.table("hacker").select("*").is_("has_team", False).execute()
         if hasattr(hackers, "data"):
             hackers = hackers.data
         else:
