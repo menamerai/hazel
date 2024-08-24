@@ -459,13 +459,21 @@ class Team(app_commands.Group):
             supabase.table("team").delete().eq("leader", interaction.user.name).limit(
                 1
             ).execute()
-            for member in members:
-                if member != interaction.user.name:
-                    supabase.table("hacker").update(
-                        {
-                            "has_team": False,
-                        }
-                    ).eq("username", member).execute()
+            if len(members) == 1:
+                supabase.table("hacker").update(
+                    {
+                        "has_team": False,
+                    }
+                ).eq("username", interaction.user.name).execute()
+            else:
+                members.remove(interaction.user.name)
+                for member in members:
+                    if member != interaction.user.name:
+                        supabase.table("hacker").update(
+                            {
+                                "has_team": False,
+                            }
+                        ).eq("username", member).execute()
             logging.info(
                 f"Team.disband: {interaction.user}'s team disbanded successfully"
             )
