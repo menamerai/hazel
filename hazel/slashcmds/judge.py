@@ -34,7 +34,7 @@ class Judge(app_commands.Group):
 
         # Check if user exists in the database
         if check_if_user_exists(
-            client=supabase, username=interaction.user.name, table="jusge"
+            client=supabase, username=interaction.user.name, table="judge"
         ):
             logging.warning(
                 f"Judge.register: {interaction.user} is already registered for the event"
