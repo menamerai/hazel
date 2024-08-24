@@ -58,7 +58,7 @@ class Matchmake(app_commands.Group):
             branch = group[0].branch.value
             members = [hacker.username for hacker in group]
 
-            await supabase.table("teams").insert(
+            await supabase.table("team").insert(
                 {
                     "root": root,
                     "leaf": leaf,
@@ -67,7 +67,7 @@ class Matchmake(app_commands.Group):
                     "leader": members[0],
                 }
             ).execute()
-            await supabase.table("hackers").update({"has_team": True}).in_(
+            await supabase.table("hacker").update({"has_team": True}).in_(
                 "username", members
             ).execute()
             logging.info(f"Matchmake.start: Saved group {members} to the database")
