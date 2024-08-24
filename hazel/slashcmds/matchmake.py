@@ -6,6 +6,7 @@ from discord import app_commands
 from supabase import Client
 
 from hazel.services.supabase_client import supabase_client
+from hazel.utils.channels import random_channel_name
 from hazel.utils.compatibility import match_mentor_team, matchmake
 from hazel.utils.models import *
 
@@ -65,6 +66,7 @@ class Matchmake(app_commands.Group):
                     "branch": branch,
                     "members": members,
                     "leader": members[0],
+                    "matchmade": True,
                 }
             ).execute()
             await supabase.table("hacker").update(
@@ -76,11 +78,80 @@ class Matchmake(app_commands.Group):
         await interaction.followup.send("Matchmaking complete!", ephemeral=True)
 
     @hacker.error
-    async def start_error(self, interaction: discord.Interaction, error):
+    async def hacker_error(self, interaction: discord.Interaction, error):
         if isinstance(error, app_commands.errors.CheckFailure):
             await interaction.response.send_message(
                 "You do not have permission to use this command", ephemeral=True
             )
+
+    @app_commands.command(
+        description="Create channels for matchmade teams (Admin only)"
+    )
+    @app_commands.checks.has_role("Admin")
+    async def create_matchmade_channels(self, interaction: discord.Interaction):
+        logging.info(
+            f"Matchmake.create_channels: Received create channels request from {interaction.user}"
+        )
+        await interaction.response.defer(ephemeral=True)
+
+        supabase: Client = self.extras["supabase"]
+
+        # Get all teams that have been matchmade
+        teams = (
+            supabase.table("team").select("members").is_("matchmade", True).execute()
+        )
+        if hasattr(teams, "data"):
+            teams = teams.data
+            logging.info(
+                f"Matchmake.create_channels: Found {len(teams)} teams in the database"
+            )
+        else:
+            await interaction.followup.send(
+                "No teams found in the database", ephemeral=True
+            )
+            return
+
+        members = [team["members"] for team in teams[0]]
+        # Create channels for the teams
+        for team in teams:
+            channel_name = random_channel_name()
+            try:
+                # create a text channel for the team and overwrite the permissions to only allow the team members to view it
+                members_obj = [
+                    discord.utils.get(interaction.guild.members, name=member)
+                    for member in members
+                ]
+                await interaction.guild.create_text_channel(
+                    name=channel_name,
+                    category=discord.utils.get(
+                        interaction.guild.categories, name="Teams"
+                    ),
+                    overwrites={
+                        interaction.guild.default_role: discord.PermissionOverwrite(
+                            read_messages=False
+                        ),
+                        interaction.guild.me: discord.PermissionOverwrite(
+                            read_messages=True
+                        ),
+                        interaction.user: discord.PermissionOverwrite(
+                            read_messages=True
+                        ),
+                        **{
+                            member: discord.PermissionOverwrite(read_messages=True)
+                            for member in members_obj
+                        },
+                    },
+                )
+                logging.info(
+                    f"Matchmake.create_channels: Created channel {channel_name} for team {team.members}"
+                )
+            except Exception as e:
+                logging.error(
+                    f"Matchmake.create_channels: Error creating channel for team {team.members}"
+                )
+                logging.error(e)
+
+        await interaction.followup.send("Channels created!", ephemeral=True)
 
     @app_commands.command(description="Start matchmaking for mentors (Admin only)")
     @app_commands.checks.has_role("Admin")
@@ -139,7 +210,7 @@ class Matchmake(app_commands.Group):
         ]
         logging.info(f"Matchmake.start: Converted teams to {teams} objects")
         # Matchmake the mentors to the teams
-        mentor_teams = match_mentor_team(mentors, teams)
+        mentor_teams, unmatched_teams = match_mentor_team(mentors, teams)
         logging.info(
             f"Matchmake.start: Matchmaking complete. Found {len(mentor_teams)} mentor teams"
         )
@@ -170,7 +241,29 @@ class Matchmake(app_commands.Group):
                     )
                     logging.error(e)
 
+        # Save the unmatched teams to the database
+        for team in unmatched_teams:
+            try:
+                await supabase.table("team").update({"mentor": "<UNMATCHED>"}).in_(
+                    "leader", team.members
+                ).execute()
+                logging.info(
+                    f"Matchmake.start: Saved mentor unmatched to team {team.members}"
+                )
+            except Exception as e:
+                logging.error(
+                    f"Matchmake.start: Error saving mentor unmatched to team {team.members}"
+                )
+                logging.error(e)
+
         await interaction.followup.send("Matchmaking complete!", ephemeral=True)
+
+    @mentor.error
+    async def mentor_error(self, interaction: discord.Interaction, error):
+        if isinstance(error, app_commands.errors.CheckFailure):
+            await interaction.response.send_message(
+                "You do not have permission to use this command", ephemeral=True
+            )
 
 
 async def setup(client: discord.Client):
