@@ -28,6 +28,7 @@ async def create_team(
             "branch": branch,
             "leaf": leaf,
             "members": [interaction.user.name],
+            "matchmade": False,
         }
     ).execute()
     supabase.table("hacker").update(
