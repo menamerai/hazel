@@ -26,3 +26,18 @@ class Hacker:
     root: Root
     leaf: Leaf
     branch: Branch
+
+
+@dataclass
+class Team:  # no leaf for easier mentor matching
+    root: Root
+    branch: Branch
+    members: list[str]
+    leader: str
+
+
+@dataclass
+class Mentor:
+    username: str
+    root: Root
+    branch: Branch
