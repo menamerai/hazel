@@ -456,8 +456,8 @@ class Team(app_commands.Group):
                 .execute()
                 .data[0]["members"]
             )
-            supabase.table("team").delete().eq("leader", interaction.user.name).limit(
-                1
+            supabase.table("team").delete().eq(
+                "leader", interaction.user.name
             ).execute()
             if len(members) == 1:
                 supabase.table("hacker").update(
