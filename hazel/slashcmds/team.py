@@ -460,11 +460,12 @@ class Team(app_commands.Group):
                 1
             ).execute()
             for member in members:
-                supabase.table("hacker").update(
-                    {
-                        "has_team": False,
-                    }
-                ).eq("username", member).execute()
+                if member != interaction.user.name:
+                    supabase.table("hacker").update(
+                        {
+                            "has_team": False,
+                        }
+                    ).eq("username", member).execute()
             logging.info(
                 f"Team.disband: {interaction.user}'s team disbanded successfully"
             )
