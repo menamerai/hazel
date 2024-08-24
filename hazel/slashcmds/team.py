@@ -959,6 +959,9 @@ class Team(app_commands.Group):
                 description=f"Root: {team['root']}\nBranch: {team['branch']}\nLeaf: {team['leaf']}",
                 color=discord.Color.blue(),
             )
+            team_embed.add_field(
+                name="Mentor", value=team["mentor"] if "mentor" in team else "None"
+            )
             team_embed.add_field(name="Members", value="\n".join(team["members"]))
             await interaction.followup.send(embed=team_embed, ephemeral=True)
 
