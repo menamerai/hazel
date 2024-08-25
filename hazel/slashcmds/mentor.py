@@ -63,13 +63,11 @@ class Mentor(app_commands.Group):
         logging.info(f"Mentor.register: registering {interaction.user} for the event")
         try:
             root = [i for i in user_roles if i in ROOT_ROLES][0]
-            leaf = [i for i in user_roles if i in LEAF_ROLES][0]
             branch = [i for i in user_roles if i in BRANCH_ROLES][0]
             supabase.table("mentor").insert(
                 {
                     "username": interaction.user.name,
                     "root": root,
-                    "leaf": leaf,
                     "branch": branch,
                 }
             ).execute()
@@ -142,12 +140,10 @@ class Mentor(app_commands.Group):
         )
         try:
             root = [i for i in user_roles if i in ROOT_ROLES][0]
-            leaf = [i for i in user_roles if i in LEAF_ROLES][0]
             branch = [i for i in user_roles if i in BRANCH_ROLES][0]
             supabase.table("mentor").update(
                 {
                     "root": root,
-                    "leaf": leaf,
                     "branch": branch,
                 }
             ).eq("username", interaction.user.name).execute()
@@ -213,7 +209,7 @@ class Mentor(app_commands.Group):
             )
             profile_embed = discord.Embed(
                 title=f"{interaction.user.name}'s Profile",
-                description=f"**Root**: {profile['root']}\n**Leaf**: {profile['leaf']}\n**Branch**: {profile['branch']}\n**Skills**: {', '.join(profile['skills'])}",
+                description=f"**Root**: {profile['root']}\n**Branch**: {profile['branch']}\n",
                 color=discord.Color.blurple(),
             )
             await interaction.followup.send(embed=profile_embed, ephemeral=True)
