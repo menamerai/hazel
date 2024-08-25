@@ -492,7 +492,7 @@ class Team(app_commands.Group):
 
         # check if user instead inputting a username, inputted a mention
         if re.match(r"<@!?(\d+)>", user):
-            user = interaction.guild.get_member(int(user[3:-1])).name
+            user = interaction.guild.get_member(int(user[2:-1])).name
 
         # Check if user exists in the database
         if not check_if_user_exists(
@@ -611,7 +611,7 @@ class Team(app_commands.Group):
 
         # check if user instead inputting a username, inputted a mention
         if re.match(r"<@!?(\d+)>", user):
-            user = interaction.guild.get_member(int(user[3:-1])).name
+            user = interaction.guild.get_member(int(user[2:-1])).name
 
         # check if the person being removed is the leader
         if interaction.user.name == user:
@@ -817,7 +817,7 @@ class Team(app_commands.Group):
 
         # check if user instead inputting a username, inputted a mention
         if re.match(r"<@!?(\d+)>", user):
-            user = interaction.guild.get_member(int(user[3:-1])).name
+            user = interaction.guild.get_member(int(user[2:-1])).name
 
         # check if the person being transferred leadership is the leader
         if interaction.user.name == user:
