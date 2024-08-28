@@ -89,22 +89,12 @@ class Mentor(app_commands.Group):
             )
 
     @app_commands.command(description="Update your skills for the event")
-    async def update(self, interaction: discord.Interaction, password: str):
+    @app_commands.checks.has_role("Mentor")
+    async def update(self, interaction: discord.Interaction):
         logging.info(f"Mentor.update: received update request from {interaction.user}")
         supabase: Client = self.extras["supabase"]
 
         await interaction.response.defer(ephemeral=True)
-
-        # check if the password is correct
-        if password != os.getenv("MENTOR_PASSWORD"):
-            logging.warning(
-                f"Mentor.update: {interaction.user} tried to update with the wrong password `{password}`"
-            )
-            await interaction.followup.send(
-                "The password you entered is incorrect. Please try again.",
-                ephemeral=True,
-            )
-            return
 
         # Check if user exists in the database
         if not check_if_user_exists(
@@ -162,25 +152,23 @@ class Mentor(app_commands.Group):
                 ephemeral=True,
             )
 
+    @update.error
+    async def update_error(self, interaction: discord.Interaction, error):
+        if isinstance(error, discord.ext.commands.errors.CheckFailure):
+            await interaction.response.send_message(
+                "You do not have the required role to update your skills",
+                ephemeral=True,
+            )
+
     @app_commands.command(description="Display your stored profile")
-    async def display(self, interaction: discord.Interaction, password: str):
+    @app_commands.checks.has_role("Mentor")
+    async def display(self, interaction: discord.Interaction):
         logging.info(
             f"Mentor.display: received display request from {interaction.user}"
         )
         supabase: Client = self.extras["supabase"]
 
         await interaction.response.defer(ephemeral=True)
-
-        # check if the password is correct
-        if password != os.getenv("MENTOR_PASSWORD"):
-            logging.warning(
-                f"Mentor.display: {interaction.user} tried to display with the wrong password `{password}`"
-            )
-            await interaction.followup.send(
-                "The password you entered is incorrect. Please try again.",
-                ephemeral=True,
-            )
-            return
 
         # Check if user exists in the database
         if not check_if_user_exists(
@@ -220,6 +208,80 @@ class Mentor(app_commands.Group):
             )
             await interaction.followup.send(
                 "An error occurred while displaying your profile for the event. Please try again later.",
+                ephemeral=True,
+            )
+
+    @display.error
+    async def display_error(self, interaction: discord.Interaction, error):
+        if isinstance(error, discord.ext.commands.errors.CheckFailure):
+            await interaction.response.send_message(
+                "You do not have the required role to display your profile",
+                ephemeral=True,
+            )
+
+    @app_commands.command(description="View all teams you are mentoring")
+    @app_commands.checks.has_role("Mentor")
+    async def teams(self, interaction: discord.Interaction):
+        logging.info(f"Mentor.teams: received teams request from {interaction.user}")
+        supabase: Client = self.extras["supabase"]
+
+        await interaction.response.defer(ephemeral=True)
+
+        # Check if user exists in the database
+        if not check_if_user_exists(
+            client=supabase, username=interaction.user.name, table="mentor"
+        ):
+            logging.warning(
+                f"Mentor.teams: {interaction.user} is not registered for the event"
+            )
+            await interaction.followup.send(
+                "You are not registered for the event. Try `/register mentor password:<insert password given>`",
+                ephemeral=True,
+            )
+            return
+
+        # Display teams mentored by user
+        logging.info(
+            f"Mentor.teams: displaying {interaction.user}'s teams for the event"
+        )
+        try:
+            teams = (
+                supabase.table("team")
+                .select("*")
+                .eq("mentor_id", interaction.user.name)
+                .execute()
+                .data
+            )
+            if not hasattr(teams, "data") or teams.data:
+                await interaction.followup.send(
+                    "You are not mentoring any teams", ephemeral=True
+                )
+                return
+
+            teams_embed = discord.Embed(
+                title=f"{interaction.user.name}'s Teams",
+                description="",
+                color=discord.Color.blurple(),
+            )
+            teams = teams.data
+            for num, team in enumerate(teams):
+                teams_embed.description += f"Team {num}: {''.join(team['members'])}\n"
+            await interaction.followup.send(embed=teams_embed, ephemeral=True)
+
+        except Exception as e:
+            logging.error(
+                f"Mentor.teams: error while displaying {interaction.user}'s teams for the event: {e}"
+            )
+            await interaction.followup.send(
+                "An error occurred while displaying your teams for the event. Please try again later.",
+                ephemeral=True,
+            )
+
+    @teams.error
+    async def teams_error(self, interaction: discord.Interaction, error):
+        if isinstance(error, discord.ext.commands.errors.CheckFailure):
+            await interaction.response.send_message(
+                "You do not have the required role to view your teams",
                 ephemeral=True,
             )
 
