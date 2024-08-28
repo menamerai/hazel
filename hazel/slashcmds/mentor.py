@@ -252,7 +252,7 @@ class Mentor(app_commands.Group):
                 .execute()
                 .data
             )
-            if not hasattr(teams, "data") or teams.data:
+            if not hasattr(teams, "data") or not teams.data:
                 await interaction.followup.send(
                     "You are not mentoring any teams", ephemeral=True
                 )
