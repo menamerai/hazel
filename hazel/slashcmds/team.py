@@ -962,7 +962,7 @@ class Team(app_commands.Group):
         try:
             team = (
                 supabase.table("team")
-                .select("leader, root, branch, leaf, members")
+                .select("leader, root, branch, leaf, members, mentor, mentor_email")
                 .limit(1)
                 .contains("members", [interaction.user.name])
                 .execute()
@@ -974,7 +974,8 @@ class Team(app_commands.Group):
                 color=discord.Color.blue(),
             )
             team_embed.add_field(
-                name="Mentor", value=team["mentor"] if "mentor" in team else "None"
+                name="Mentor",
+                value=f"Discord ID: {team['mentor'] if 'mentor' in team else 'None'}\nEmail: {team['mentor_email'] if 'mentor_email' in team else 'None'}",
             )
             team_embed.add_field(name="Members", value="\n".join(team["members"]))
             await interaction.followup.send(embed=team_embed, ephemeral=True)
