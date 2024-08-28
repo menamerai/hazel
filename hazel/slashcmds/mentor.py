@@ -264,7 +264,9 @@ class Mentor(app_commands.Group):
                 color=discord.Color.blurple(),
             )
             for num, team in enumerate(teams):
-                teams_embed.description += f"Team {num}: {''.join(team['members'])}\n"
+                teams_embed.description += (
+                    f"Team {num + 1}: {''.join(team['members'])}\n"
+                )
             await interaction.followup.send(embed=teams_embed, ephemeral=True)
 
         except Exception as e:
