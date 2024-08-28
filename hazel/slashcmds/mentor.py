@@ -252,7 +252,7 @@ class Mentor(app_commands.Group):
                 .execute()
                 .data
             )
-            if not hasattr(teams, "data") or not teams.data:
+            if not teams:
                 await interaction.followup.send(
                     "You are not mentoring any teams", ephemeral=True
                 )
@@ -263,7 +263,6 @@ class Mentor(app_commands.Group):
                 description="",
                 color=discord.Color.blurple(),
             )
-            teams = teams.data
             for num, team in enumerate(teams):
                 teams_embed.description += f"Team {num}: {''.join(team['members'])}\n"
             await interaction.followup.send(embed=teams_embed, ephemeral=True)
